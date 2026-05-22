@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from aiogram import Bot, Dispatcher
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,8 +25,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Инициализация базы данных...")
+    await init_db()
+    
+    logger.info("Проверка и наполнение начальными данными...")
+    async with async_session_maker() as session:
+        await setup_initial_database(session)
+        
+    logger.info("Запуск Telegram-бота в фоновом режиме (polling)...")
+    # Запускаем polling бота параллельно с FastAPI сервером
+    polling_task = asyncio.create_task(dp.start_polling(bot))
+    
+    yield
+    
+    logger.info("Остановка приложения...")
+    polling_task.cancel()
+    await bot.session.close()
+
 # Инициализация FastAPI
-app = FastAPI(title="Vape Shop API", version="1.0.0")
+app = FastAPI(title="Vape Shop API", version="1.0.0", lifespan=lifespan)
 
 # Настройка CORS для локального тестирования
 app.add_middleware(
@@ -62,19 +82,6 @@ async def health_check():
     """Простейший эндпоинт для проверки жизнеспособности (Railway healthcheck)."""
     return {"status": "ok"}
 
-@app.on_event("startup")
-async def on_startup():
-    logger.info("Инициализация базы данных...")
-    await init_db()
-    
-    logger.info("Проверка и наполнение начальными данными...")
-    async with async_session_maker() as session:
-        await setup_initial_database(session)
-        
-    logger.info("Запуск Telegram-бота в фоновом режиме (polling)...")
-    # Запускаем polling бота параллельно с FastAPI сервером
-    asyncio.create_task(dp.start_polling(bot))
-
 if __name__ == "__main__":
-    # Запуск сервера uvicorn на порту из конфигурации
-    uvicorn.run("main:app", host="0.0.0.0", port=settings.port, reload=False)
+    # Передаем объект app напрямую, чтобы избежать двойного импорта файла и ошибки "Router is already attached"
+    uvicorn.run(app, host="0.0.0.0", port=settings.port)
