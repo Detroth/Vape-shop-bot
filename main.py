@@ -4,6 +4,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from aiogram import Bot, Dispatcher
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from aiogram.client.default import DefaultBotProperties
@@ -85,6 +86,11 @@ dp.include_router(admin_router)
 async def health_check():
     """Простейший эндпоинт для проверки жизнеспособности (Railway healthcheck)."""
     return {"status": "ok"}
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """Перенаправляет посетителей с корня сайта в Mini App магазин."""
+    return RedirectResponse(url="/store/")
 
 if __name__ == "__main__":
     # Передаем объект app напрямую, чтобы избежать двойного импорта файла и ошибки "Router is already attached"
