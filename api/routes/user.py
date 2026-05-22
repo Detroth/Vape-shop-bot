@@ -11,7 +11,8 @@ router = APIRouter(prefix="/user", tags=["User"])
 
 @router.get("/profile", response_model=UserResponse)
 async def get_profile(user_data: dict = Depends(verify_telegram_webapp_data), db: AsyncSession = Depends(get_db)):
-    telegram_id = user_data["id"]
+    # Обязательно приводим к типу int. Telegram может передать id строкой, что ломает поиск по БД (BigInteger)
+    telegram_id = int(user_data["id"])
     username = user_data.get("username")
     
     result = await db.execute(select(User).where(User.telegram_id == telegram_id))
