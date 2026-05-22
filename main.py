@@ -9,7 +9,7 @@ from aiogram.client.default import DefaultBotProperties
 from sqladmin import Admin
 
 from core.config import settings
-from core.database import init_db, engine
+from core.database import init_db, engine, async_session_maker, setup_initial_database
 from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
 from api.admin_panel import authentication_backend, UserAdmin, CategoryAdmin, ProductAdmin, OrderAdmin, PromocodeAdmin
@@ -39,7 +39,7 @@ app.add_middleware(
 # Регистрация эндпоинтов Mini App
 app.include_router(api_router, prefix="/api")
 
-app.mount("/web", StaticFiles(directory="web"), name="web")
+app.mount("/store", StaticFiles(directory="web", html=True), name="store")
 
 # Настройка визуальной админ-панели (SQLAdmin)
 admin = Admin(app, engine, authentication_backend=authentication_backend, title="Vape Shop Admin")
@@ -66,6 +66,11 @@ async def health_check():
 async def on_startup():
     logger.info("Инициализация базы данных...")
     await init_db()
+    
+    logger.info("Проверка и наполнение начальными данными...")
+    async with async_session_maker() as session:
+        await setup_initial_database(session)
+        
     logger.info("Запуск Telegram-бота в фоновом режиме (polling)...")
     # Запускаем polling бота параллельно с FastAPI сервером
     asyncio.create_task(dp.start_polling(bot))
