@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Маскируем пароль для безопасного вывода в логи
+    safe_url = settings.database_url.replace(settings.db_pass, "******") if settings.db_pass else settings.database_url
+    logger.info(f"Попытка подключения к БД по адресу: {safe_url}")
+    
     logger.info("Инициализация базы данных...")
     await init_db()
     
