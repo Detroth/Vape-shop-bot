@@ -182,13 +182,20 @@ async function loadUserProfile() {
         const res = await fetch(url, { headers: { 'X-Telegram-Init-Data': tg.initData } });
         if(res.ok) {
             appState.profile = await res.json();
-            document.getElementById('profile-balance').textContent = `${appState.profile.balance} Br`;
-            document.getElementById('profile-bonuses').textContent = `${appState.profile.bonus_points} pts`;
-            document.getElementById('profile-discount').textContent = `${appState.profile.personal_discount}%`;
+            
+            const balEl = document.getElementById('profile-balance');
+            if (balEl) balEl.textContent = `${appState.profile.balance} Br`;
+            
+            const bonEl = document.getElementById('profile-bonuses');
+            if (bonEl) bonEl.textContent = `${appState.profile.bonus_points} pts`;
+            
+            const discEl = document.getElementById('profile-discount');
+            if (discEl) discEl.textContent = `${appState.profile.personal_discount}%`;
             
             // Также обновляем имя, если оно подтянулось из БД
-            if (appState.profile.username) {
-                document.getElementById('profile-username').textContent = `@${appState.profile.username}`;
+            const userEl = document.getElementById('profile-username');
+            if (userEl && appState.profile.username) {
+                userEl.textContent = `@${appState.profile.username}`;
             }
         }
     } catch (e) { console.error("Ошибка загрузки профиля", e); }
@@ -370,6 +377,7 @@ async function checkout() {
             appState.cart = {};
             appState.promoCode = null;
             saveCart();
+            loadUserProfile(); // Обновляем профиль (баланс, скидки и др.)
             switchTab('catalog');
         } else { tg.showAlert("Ошибка при оформлении заказа"); }
     } catch (e) { tg.showAlert("Ошибка сети"); }
@@ -390,4 +398,5 @@ function toggleFavorite(productId) {
 document.addEventListener('DOMContentLoaded', () => {
     switchTab('catalog');
     fetchProducts();
+    loadUserProfile(); // Сразу при входе грузим профиль
 });

@@ -44,21 +44,33 @@ site = AdminSite(
 # Делаем id опциональным, чтобы при создании новых записей админка не требовала вводить его вручную
 
 class CategorySchema(BaseModel):
-    id: Optional[int] = None
+    id: int
+    name: str
+
+class CategoryCreateSchema(BaseModel):
     name: str
 
 class ProductSchema(BaseModel):
-    id: Optional[int] = None
+    id: int
     category_id: int
     name: str
     description: Optional[str] = None
     price: float
     stock: int
     image_url: Optional[str] = None
-    characteristics: Optional[Dict[str, Any]] = None
+    characteristics: Optional[Any] = None
+
+class ProductCreateSchema(BaseModel):
+    category_id: int
+    name: str
+    description: Optional[str] = None
+    price: float
+    stock: int
+    image_url: Optional[str] = None
+    characteristics: Optional[Any] = None
 
 class OrderSchema(BaseModel):
-    id: Optional[int] = None
+    id: int
     user_id: int
     status: str
     total_price: float
@@ -66,8 +78,22 @@ class OrderSchema(BaseModel):
     address: Optional[str] = None
     created_at: Optional[datetime] = None
 
+class OrderCreateSchema(BaseModel):
+    user_id: int
+    status: str
+    total_price: float
+    promo_code_used: Optional[str] = None
+    address: Optional[str] = None
+
 class PromocodeSchema(BaseModel):
-    id: Optional[int] = None
+    id: int
+    code: str
+    discount_type: str
+    value: float
+    max_uses: int
+    current_uses: int
+
+class PromocodeCreateSchema(BaseModel):
     code: str
     discount_type: str
     value: float
@@ -87,6 +113,8 @@ class CategoryAdmin(admin.ModelAdmin):
     label = "Категории"
     model = Category
     schema = CategorySchema
+    schema_create = CategoryCreateSchema
+    schema_update = CategoryCreateSchema
 
 @site.register_admin
 class ProductAdmin(admin.ModelAdmin):
@@ -94,6 +122,8 @@ class ProductAdmin(admin.ModelAdmin):
     label = "Товары"
     model = Product
     schema = ProductSchema
+    schema_create = ProductCreateSchema
+    schema_update = ProductCreateSchema
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
@@ -114,6 +144,8 @@ class OrderAdmin(admin.ModelAdmin):
     label = "Заказы"
     model = Order
     schema = OrderSchema
+    schema_create = OrderCreateSchema
+    schema_update = OrderCreateSchema
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
@@ -139,6 +171,8 @@ class PromocodeAdmin(admin.ModelAdmin):
     label = "Промокоды"
     model = Promocode
     schema = PromocodeSchema
+    schema_create = PromocodeCreateSchema
+    schema_update = PromocodeCreateSchema
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
