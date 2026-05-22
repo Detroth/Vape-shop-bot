@@ -29,4 +29,8 @@ async def get_profile(user_data: dict = Depends(verify_telegram_webapp_data), db
         await db.commit()
         await db.refresh(user)
         
+    else:
+        # Принудительно обновляем данные из БД, чтобы подтянуть изменения баланса из админки
+        await db.refresh(user)
+        
     return user

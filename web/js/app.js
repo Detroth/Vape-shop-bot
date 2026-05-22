@@ -177,7 +177,9 @@ function closeProductDetails() {
 // --- ЛОГИКА ПРОФИЛЯ ---
 async function loadUserProfile() {
     try {
-        const res = await fetch('/api/user/profile', { headers: { 'X-Telegram-Init-Data': tg.initData } });
+        tg.ready(); // Синхронизация с клиентом Telegram
+        const url = `/api/user/profile?t=${Date.now()}`; // Очистка кэша браузера
+        const res = await fetch(url, { headers: { 'X-Telegram-Init-Data': tg.initData } });
         if(res.ok) {
             appState.profile = await res.json();
             document.getElementById('profile-balance').textContent = `${appState.profile.balance} Br`;

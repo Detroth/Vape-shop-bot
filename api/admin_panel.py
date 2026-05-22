@@ -35,7 +35,7 @@ site = AdminSite(
         database_url_async=settings.database_url,
         site_title="Vape Shop Admin",
         site_path="/admin",
-        language="ru_RU",
+        locale="ru_RU",
     ),
     engine=engine
 )
@@ -84,12 +84,14 @@ class UserSchema(BaseModel):
 @site.register_admin
 class CategoryAdmin(admin.ModelAdmin):
     page_schema = "Категории"
+    label = "Категории"
     model = Category
     schema = CategorySchema
 
 @site.register_admin
 class ProductAdmin(admin.ModelAdmin):
     page_schema = "Товары"
+    label = "Товары"
     model = Product
     schema = ProductSchema
     search_fields = [Product.name]
@@ -109,6 +111,7 @@ class ProductAdmin(admin.ModelAdmin):
 @site.register_admin
 class OrderAdmin(admin.ModelAdmin):
     page_schema = "Заказы"
+    label = "Заказы"
     model = Order
     schema = OrderSchema
     
@@ -133,6 +136,7 @@ class OrderAdmin(admin.ModelAdmin):
 @site.register_admin
 class PromocodeAdmin(admin.ModelAdmin):
     page_schema = "Промокоды"
+    label = "Промокоды"
     model = Promocode
     schema = PromocodeSchema
     
@@ -149,6 +153,7 @@ class PromocodeAdmin(admin.ModelAdmin):
 @site.register_admin
 class UserAdmin(admin.ModelAdmin):
     page_schema = "Пользователи"
+    label = "Пользователи"
     model = User
     pk_name = "telegram_id"
     schema = UserSchema
