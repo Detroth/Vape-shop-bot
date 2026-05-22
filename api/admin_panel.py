@@ -75,7 +75,6 @@ class PromocodeSchema(BaseModel):
     current_uses: int
 
 class UserSchema(BaseModel):
-    id: Optional[int] = None
     telegram_id: int
     username: Optional[str] = None
     balance: float
@@ -151,6 +150,7 @@ class PromocodeAdmin(admin.ModelAdmin):
 class UserAdmin(admin.ModelAdmin):
     page_schema = "Пользователи"
     model = User
+    pk_name = "telegram_id"
     schema = UserSchema
     search_fields = [User.username, User.telegram_id]
     
