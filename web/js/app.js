@@ -41,8 +41,8 @@ function switchTab(tabName) {
         renderCart();
     }
     
-    if (tabName === 'profile' && !appState.profile) {
-        fetchProfile();
+    if (tabName === 'profile') {
+        loadUserProfile();
     }
 
     // 3. Обновляем цвета кнопок в навигации
@@ -175,7 +175,7 @@ function closeProductDetails() {
 }
 
 // --- ЛОГИКА ПРОФИЛЯ ---
-async function fetchProfile() {
+async function loadUserProfile() {
     try {
         const res = await fetch('/api/user/profile', { headers: { 'X-Telegram-Init-Data': tg.initData } });
         if(res.ok) {
@@ -183,6 +183,11 @@ async function fetchProfile() {
             document.getElementById('profile-balance').textContent = `${appState.profile.balance} Br`;
             document.getElementById('profile-bonuses').textContent = `${appState.profile.bonus_points} pts`;
             document.getElementById('profile-discount').textContent = `${appState.profile.personal_discount}%`;
+            
+            // Также обновляем имя, если оно подтянулось из БД
+            if (appState.profile.username) {
+                document.getElementById('profile-username').textContent = `@${appState.profile.username}`;
+            }
         }
     } catch (e) { console.error("Ошибка загрузки профиля", e); }
 }

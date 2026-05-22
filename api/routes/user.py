@@ -18,7 +18,13 @@ async def get_profile(user_data: dict = Depends(verify_telegram_webapp_data), db
     user = result.scalar_one_or_none()
     
     if not user:
-        user = User(telegram_id=telegram_id, username=username)
+        user = User(
+            telegram_id=telegram_id, 
+            username=username,
+            balance=0,
+            bonus_points=0,
+            personal_discount=0
+        )
         db.add(user)
         await db.commit()
         await db.refresh(user)

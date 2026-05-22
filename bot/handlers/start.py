@@ -2,12 +2,30 @@ from aiogram import Router, F, html
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
+from sqlalchemy import select
 from bot.keyboards import get_main_keyboard
+from core.database import async_session_maker
+from core.models import User
 
 start_router = Router()
 
 @start_router.message(CommandStart())
 async def cmd_start(message: Message):
+    async with async_session_maker() as session:
+        result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            new_user = User(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                balance=0,
+                bonus_points=0,
+                personal_discount=0
+            )
+            session.add(new_user)
+            await session.commit()
+            
     await message.answer(
         f"Привет, {html.bold(message.from_user.full_name)}! Добро пожаловать в наш современный вейп-шоп 💨\n\n"
         "Нажми кнопку ниже, чтобы открыть магазин и сделать заказ.",

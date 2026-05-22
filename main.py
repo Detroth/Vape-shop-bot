@@ -8,13 +8,12 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from aiogram.client.default import DefaultBotProperties
-from sqladmin import Admin
 
 from core.config import settings
 from core.database import init_db, engine, async_session_maker, setup_initial_database
 from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
-from api.admin_panel import authentication_backend, UserAdmin, CategoryAdmin, ProductAdmin, OrderAdmin, PromocodeAdmin
+from api.admin_panel import setup_admin
 
 # Импорт роутеров API
 from api.routes import api_router
@@ -66,13 +65,8 @@ app.include_router(api_router, prefix="/api")
 
 app.mount("/store", StaticFiles(directory="web", html=True), name="store")
 
-# Настройка визуальной админ-панели (SQLAdmin)
-admin = Admin(app, engine, authentication_backend=authentication_backend, title="Vape Shop Admin")
-admin.add_view(UserAdmin)
-admin.add_view(CategoryAdmin)
-admin.add_view(ProductAdmin)
-admin.add_view(OrderAdmin)
-admin.add_view(PromocodeAdmin)
+# Инициализация современной админ-панели (FastAPI Amis Admin)
+setup_admin(app)
 
 # Инициализация бота и диспетчера
 bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
