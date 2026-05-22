@@ -5,7 +5,6 @@ tg.ready();
 
 // Глобальное состояние
 const appState = {
-    user: tg.initDataUnsafe?.user || null,
     profile: null,
     products: [], 
     cart: JSON.parse(localStorage.getItem('vape_cart') || '{}'),
@@ -15,12 +14,26 @@ const appState = {
     promoCode: null
 };
 
-// Отображаем имя пользователя (если есть)
-if (appState.user) {
-    document.getElementById('profile-name').textContent = appState.user.first_name || appState.user.username;
-    document.getElementById('profile-username').textContent = appState.user.username ? `@${appState.user.username}` : '';
-} else {
-    document.getElementById('profile-name').textContent = "Гость";
+// Динамическое получение данных (на случай если Telegram загрузится с задержкой)
+const getInitData = () => window.Telegram.WebApp.initData || "test";
+
+// Моментальное обновление визуала профиля из клиента Telegram
+function renderProfileHeader(dbUser = null) {
+    const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+    const nameEl = document.getElementById('profile-name');
+    const usernameEl = document.getElementById('profile-username');
+    
+    if (tgUser) {
+        if (nameEl) nameEl.textContent = tgUser.first_name || tgUser.username || "Пользователь";
+    } else {
+        if (nameEl) nameEl.textContent = "Гость";
+    }
+    
+    if (dbUser && dbUser.username && usernameEl) {
+        usernameEl.textContent = `@${dbUser.username}`;
+    } else if (tgUser && tgUser.username && usernameEl) {
+        usernameEl.textContent = `@${tgUser.username}`;
+    }
 }
 
 // Функция переключения вкладок
@@ -65,7 +78,7 @@ function switchTab(tabName) {
 async function fetchProducts() {
     try {
         const response = await fetch('/api/catalog/products', {
-            headers: { 'X-Telegram-Init-Data': tg.initData }
+            headers: { 'X-Telegram-Init-Data': getInitData() }
         });
         if (response.ok) {
             appState.products = await response.json();
@@ -179,7 +192,7 @@ async function loadUserProfile() {
     try {
         tg.ready(); // Синхронизация с клиентом Telegram
         const url = `/api/user/profile?t=${Date.now()}`; // Очистка кэша браузера
-        const res = await fetch(url, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+        const res = await fetch(url, { headers: { 'X-Telegram-Init-Data': getInitData() } });
         if(res.ok) {
             appState.profile = await res.json();
             
@@ -192,11 +205,8 @@ async function loadUserProfile() {
             const discEl = document.getElementById('profile-discount');
             if (discEl) discEl.textContent = `${appState.profile.personal_discount}%`;
             
-            // Также обновляем имя, если оно подтянулось из БД
-            const userEl = document.getElementById('profile-username');
-            if (userEl && appState.profile.username) {
-                userEl.textContent = `@${appState.profile.username}`;
-            }
+            // Обновляем шапку, подтянув данные из базы
+            renderProfileHeader(appState.profile);
         }
     } catch (e) { console.error("Ошибка загрузки профиля", e); }
 }
@@ -298,7 +308,7 @@ async function validateCartOnBackend() {
     try {
         const res = await fetch('/api/cart/validate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': getInitData() },
             body: JSON.stringify({ items, promo_code: appState.promoCode })
         });
         if (res.ok) {
@@ -369,7 +379,7 @@ async function checkout() {
     try {
         const res = await fetch('/api/orders/create', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': getInitData() },
             body: JSON.stringify({ items, promo_code: appState.promoCode, address: "Самовывоз" })
         });
         if (res.ok) {
@@ -396,6 +406,7 @@ function toggleFavorite(productId) {
 
 // Запуск
 document.addEventListener('DOMContentLoaded', () => {
+    renderProfileHeader(); // Моментально показываем имя из Telegram
     switchTab('catalog');
     fetchProducts();
     loadUserProfile(); // Сразу при входе грузим профиль

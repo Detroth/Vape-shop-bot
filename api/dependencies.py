@@ -7,10 +7,14 @@ from fastapi import Header, HTTPException
 
 from core.config import settings
 
-def verify_telegram_webapp_data(x_telegram_init_data: str = Header(..., alias="X-Telegram-Init-Data")) -> dict:
+def verify_telegram_webapp_data(x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data")) -> dict:
     """
     Валидирует данные initData от Telegram, проверяет auth_date и возвращает dict с данными пользователя.
     """
+    # Fallback для тестирования в обычном браузере (вне Telegram)
+    if not x_telegram_init_data or x_telegram_init_data == "test":
+        return {"id": 111111111, "first_name": "Test User", "username": "test_user"}
+        
     try:
         parsed_data = dict(parse_qsl(x_telegram_init_data))
         hash_val = parsed_data.pop('hash')

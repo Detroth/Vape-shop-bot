@@ -26,7 +26,8 @@ async def create_order(
     if not request.items:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
-    user_result = await db.execute(select(User).where(User.telegram_id == user_data["id"]))
+    telegram_id = int(user_data["id"])
+    user_result = await db.execute(select(User).where(User.telegram_id == telegram_id))
     user = user_result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -113,8 +114,9 @@ async def get_my_orders(
     user_data: dict = Depends(verify_telegram_webapp_data),
     db: AsyncSession = Depends(get_db)
 ):
+    telegram_id = int(user_data["id"])
     query = select(Order).where(
-        Order.user_id == user_data["id"]
+        Order.user_id == telegram_id
     ).order_by(desc(Order.created_at)).options(selectinload(Order.items))
     
     result = await db.execute(query)
