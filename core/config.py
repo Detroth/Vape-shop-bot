@@ -1,17 +1,17 @@
 # core/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, AliasChoices
 
 class Settings(BaseSettings):
     bot_token: str = Field(..., description="Токен Telegram бота")
     mini_app_url: str = Field(..., description="URL Mini App")
     admin_chat_id: int = Field(default=0, description="ID чата администраторов")
     
-    db_host: str = Field(..., description="Хост БД")
-    db_port: int = Field(3306, description="Порт БД")
-    db_user: str = Field(..., description="Пользователь БД")
-    db_pass: str = Field(..., description="Пароль БД")
-    db_name: str = Field(..., description="Имя БД")
+    db_host: str = Field(..., validation_alias=AliasChoices("DB_HOST", "MYSQLHOST"), description="Хост БД")
+    db_port: int = Field(3306, validation_alias=AliasChoices("DB_PORT", "MYSQLPORT"), description="Порт БД")
+    db_user: str = Field(..., validation_alias=AliasChoices("DB_USER", "MYSQLUSER"), description="Пользователь БД")
+    db_pass: str = Field(..., validation_alias=AliasChoices("DB_PASS", "MYSQLPASSWORD"), description="Пароль БД")
+    db_name: str = Field(..., validation_alias=AliasChoices("DB_NAME", "MYSQLDATABASE"), description="Имя БД")
     
     port: int = Field(8000, description="Порт для FastAPI")
 
