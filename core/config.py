@@ -1,13 +1,25 @@
 # core/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, computed_field
 
 class Settings(BaseSettings):
     bot_token: str = Field(..., description="Токен Telegram бота")
-    # Пример формата: mysql+aiomysql://user:pass@localhost:3306/vape_shop
-    database_url: str = Field(..., description="URL для подключения к MySQL")
+    mini_app_url: str = Field(..., description="URL Mini App")
     admin_chat_id: int = Field(default=0, description="ID чата администраторов")
     
+    db_host: str = Field(..., description="Хост БД")
+    db_port: int = Field(3306, description="Порт БД")
+    db_user: str = Field(..., description="Пользователь БД")
+    db_pass: str = Field(..., description="Пароль БД")
+    db_name: str = Field(..., description="Имя БД")
+    
+    port: int = Field(8000, description="Порт для FastAPI")
+    
+    @computed_field
+    @property
+    def database_url(self) -> str:
+        return f"mysql+aiomysql://{self.db_user}:{self.db_pass}@{self.db_host}:{self.db_port}/{self.db_name}"
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8", 

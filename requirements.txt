@@ -2,9 +2,11 @@
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 # Telegram Bot
-aiogram>=3.3.0
+aiogram>=3.13.0
 # Database
+pydantic>=2.9.0
 sqlalchemy[asyncio]>=2.0.25
 aiomysql>=0.2.0
 pydantic-settings>=2.1.0
 alembic>=1.13.1
+cryptography>=43.0.0
