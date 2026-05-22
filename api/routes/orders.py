@@ -75,6 +75,7 @@ async def create_order(
     db.add(new_order)
     await db.flush() 
     
+    items_text_lines = []
     for item in request.items:
         # Находим реальный товар из списка кэшированных
         product_obj = next(p for p, _ in product_updates if p.id == item.product_id)
@@ -84,12 +85,24 @@ async def create_order(
             quantity=item.quantity,
             price_at_purchase=product_obj.price
         ))
+        items_text_lines.append(f"- {product_obj.name} ({item.quantity} шт.)")
         
     await db.commit()
     
     if settings.admin_chat_id:
         try:
-            await notify_new_order(bot, settings.admin_chat_id, new_order.id, float(final_total))
+            items_text = "\n".join(items_text_lines)
+            username = f"@{user.username}" if user.username else "Без имени"
+            await notify_new_order(
+                bot=bot, 
+                admin_chat_id=settings.admin_chat_id, 
+                order_id=new_order.id, 
+                username=username, 
+                user_id=user.telegram_id, 
+                items_text=items_text, 
+                address=request.address, 
+                total_price=float(final_total)
+            )
         except Exception:
             pass # Не сбрасываем заказ, если бот заблокирован
         

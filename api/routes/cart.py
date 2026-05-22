@@ -13,8 +13,9 @@ from api.schemas import CartValidateRequest
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
 class CartValidateResponse(BaseModel):
-    total_price: Decimal
-    discount_sum: Decimal
+    base_total: Decimal
+    discount_amount: Decimal
+    final_total: Decimal
     promo_status: Optional[str]
 
 @router.post("/validate", response_model=CartValidateResponse)
@@ -32,8 +33,7 @@ async def validate_cart(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    base_total = Decimal("0.00")
-    discount_sum = Decimal("0.00")
+    initial_base_total = Decimal("0.00")
     
     # Валидируем наличие товаров и считаем базовую сумму
     for item in request.items:
@@ -45,13 +45,16 @@ async def validate_cart(
         if product.stock < item.quantity:
             raise HTTPException(status_code=400, detail=f"Not enough stock for '{product.name}'")
             
-        base_total += product.price * item.quantity
+        initial_base_total += product.price * item.quantity
+
+    current_total = initial_base_total
+    discount_amount = Decimal("0.00")
 
     # Применяем персональную скидку пользователя
     if user.personal_discount > 0:
-        personal_discount_val = base_total * Decimal(str(user.personal_discount / 100))
-        discount_sum += personal_discount_val
-        base_total -= personal_discount_val
+        personal_discount_val = current_total * Decimal(str(user.personal_discount / 100))
+        discount_amount += personal_discount_val
+        current_total -= personal_discount_val
 
     promo_status = None
 
@@ -63,22 +66,27 @@ async def validate_cart(
         if not promo:
             promo_status = "not_found"
         elif promo.current_uses >= promo.max_uses:
-            promo_status = "exhausted"
+            promo_status = "expired"
         else:
             promo_status = "valid"
             promo_discount = Decimal("0.00")
             if promo.discount_type == DiscountType.PERCENTAGE:
-                promo_discount = base_total * (promo.value / Decimal("100"))
+                promo_discount = current_total * (promo.value / Decimal("100"))
             elif promo.discount_type == DiscountType.FIXED:
                 promo_discount = promo.value
                 
-            discount_sum += promo_discount
-            base_total -= promo_discount
+            # Защита: скидка не может быть больше текущей суммы
+            if promo_discount > current_total:
+                promo_discount = current_total
+                
+            discount_amount += promo_discount
+            current_total -= promo_discount
 
-    final_total = max(Decimal("0.00"), base_total)
+    final_total = max(Decimal("0.00"), current_total)
     
     return CartValidateResponse(
-        total_price=final_total,
-        discount_sum=discount_sum,
+        base_total=initial_base_total,
+        discount_amount=discount_amount,
+        final_total=final_total,
         promo_status=promo_status
     )

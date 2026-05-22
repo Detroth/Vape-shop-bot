@@ -289,12 +289,12 @@ async function validateCartOnBackend() {
         });
         if (res.ok) {
             const data = await res.json();
-            document.getElementById('cart-total').textContent = `${data.total_price} Br`;
+            document.getElementById('cart-total').textContent = `${data.final_total} Br`;
             
             const discRow = document.getElementById('cart-discount-row');
-            if (data.discount_sum > 0) {
+            if (data.discount_amount > 0) {
                 discRow.classList.remove('hidden');
-                document.getElementById('cart-discount-val').textContent = `-${data.discount_sum} Br`;
+                document.getElementById('cart-discount-val').textContent = `-${data.discount_amount} Br`;
                 document.getElementById('cart-discount-label').textContent = data.promo_status === 'valid' ? 'Скидка (промо)' : 'Скидка';
             } else {
                 discRow.classList.add('hidden');

@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     db_name: str = Field(..., description="Имя БД")
     
     port: int = Field(8000, description="Порт для FastAPI")
+
+    admin_username: str = Field("admin", description="Логин админ-панели")
+    admin_password: str = Field("admin", description="Пароль админ-панели")
+    admin_secret_key: str = Field("secret", description="Секретный ключ для куки сессий")
     
     @computed_field
     @property

@@ -3,12 +3,16 @@ import logging
 import uvicorn
 from fastapi import FastAPI
 from aiogram import Bot, Dispatcher
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from aiogram.client.default import DefaultBotProperties
+from sqladmin import Admin
 
 from core.config import settings
-from core.database import init_db
+from core.database import init_db, engine
 from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
+from api.admin_panel import authentication_backend, UserAdmin, CategoryAdmin, ProductAdmin, OrderAdmin, PromocodeAdmin
 
 # Импорт роутеров API
 from api.routes import api_router
@@ -23,8 +27,27 @@ logger = logging.getLogger(__name__)
 # Инициализация FastAPI
 app = FastAPI(title="Vape Shop API", version="1.0.0")
 
+# Настройка CORS для локального тестирования
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Регистрация эндпоинтов Mini App
 app.include_router(api_router, prefix="/api")
+
+app.mount("/web", StaticFiles(directory="web"), name="web")
+
+# Настройка визуальной админ-панели (SQLAdmin)
+admin = Admin(app, engine, authentication_backend=authentication_backend, title="Vape Shop Admin")
+admin.add_view(UserAdmin)
+admin.add_view(CategoryAdmin)
+admin.add_view(ProductAdmin)
+admin.add_view(OrderAdmin)
+admin.add_view(PromocodeAdmin)
 
 # Инициализация бота и диспетчера
 bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
