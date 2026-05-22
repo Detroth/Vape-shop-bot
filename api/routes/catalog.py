@@ -1,39 +1,44 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, asc, desc
-from pydantic import BaseModel
+from sqlalchemy import select, asc, desc, or_
 
 from core.database import get_db
 from core.models import Category, Product
+from api.schemas import CategoryResponse, ProductResponse
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
-# --- Pydantic Схемы ---
-class CategoryOut(BaseModel):
-    id: int
-    name: str
-
-class ProductOut(BaseModel):
-    id: int
-    name: str
-    price: float
-    stock: int
-    image_url: Optional[str] = None
-
-@router.get("/categories", response_model=List[CategoryOut])
+@router.get("/categories", response_model=List[CategoryResponse])
 async def get_categories(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Category))
     return result.scalars().all()
 
-@router.get("/categories/{category_id}/products", response_model=List[ProductOut])
-async def get_products(category_id: int, sort_price: Optional[str] = None, db: AsyncSession = Depends(get_db)):
-    query = select(Product).where(Product.category_id == category_id)
+@router.get("/products", response_model=List[ProductResponse])
+async def get_products(
+    category_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None, description="cheapest, expensive, alphabetical"),
+    db: AsyncSession = Depends(get_db)
+):
+    query = select(Product)
     
-    if sort_price == "asc":
+    if category_id is not None:
+        query = query.where(Product.category_id == category_id)
+        
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(or_(
+            Product.name.ilike(search_term),
+            Product.description.ilike(search_term)
+        ))
+        
+    if sort == "cheapest":
         query = query.order_by(asc(Product.price))
-    elif sort_price == "desc":
+    elif sort == "expensive":
         query = query.order_by(desc(Product.price))
+    elif sort == "alphabetical":
+        query = query.order_by(asc(Product.name))
         
     result = await db.execute(query)
     return result.scalars().all()

@@ -6,14 +6,12 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 
 from core.config import settings
+from core.database import init_db
 from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
 
 # Импорт роутеров API
-from api.routes.catalog import router as catalog_router
-from api.routes.user import router as user_router
-from api.routes.cart import router as cart_router
-from api.routes.orders import router as orders_router
+from api.routes import api_router
 
 # Настройка логирования
 logging.basicConfig(
@@ -26,10 +24,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Vape Shop API", version="1.0.0")
 
 # Регистрация эндпоинтов Mini App
-app.include_router(catalog_router, prefix="/api")
-app.include_router(user_router, prefix="/api")
-app.include_router(cart_router, prefix="/api")
-app.include_router(orders_router, prefix="/api")
+app.include_router(api_router, prefix="/api")
 
 # Инициализация бота и диспетчера
 bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
@@ -46,6 +41,8 @@ async def health_check():
 
 @app.on_event("startup")
 async def on_startup():
+    logger.info("Инициализация базы данных...")
+    await init_db()
     logger.info("Запуск Telegram-бота в фоновом режиме (polling)...")
     # Запускаем polling бота параллельно с FastAPI сервером
     asyncio.create_task(dp.start_polling(bot))

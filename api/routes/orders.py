@@ -3,65 +3,109 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select
-from pydantic import BaseModel
+from sqlalchemy import select, desc
 from aiogram import Bot
 
 from core.config import settings
 from core.database import get_db
-from core.models import Order, OrderItem, OrderStatus, Product
-from api.dependencies import verify_telegram_web_app_data
+from core.models import Order, OrderItem, OrderStatus, Product, User, Promocode, DiscountType
+from api.dependencies import verify_telegram_webapp_data
 from bot.handlers.admin import notify_new_order
+from api.schemas import OrderCreateRequest, OrderResponse
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
-# Инициализируем бота для отправки уведомлений из API
 bot = Bot(token=settings.bot_token)
 
-class OrderItemIn(BaseModel):
-    product_id: int
-    quantity: int
-    price: Decimal
-
-class OrderCreate(BaseModel):
-    total_price: Decimal
-    address: Optional[str] = None
-    promo_code: Optional[str] = None
-    items: List[OrderItemIn]
-
-@router.post("")
+@router.post("/create")
 async def create_order(
-    order_in: OrderCreate, 
-    telegram_id: int = Depends(verify_telegram_web_app_data), 
+    request: OrderCreateRequest, 
+    user_data: dict = Depends(verify_telegram_webapp_data), 
     db: AsyncSession = Depends(get_db)
 ):
-    # Создаем заказ
+    if not request.items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    user_result = await db.execute(select(User).where(User.telegram_id == user_data["id"]))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    base_total = Decimal("0.00")
+    product_updates = []
+
+    for item in request.items:
+        prod_result = await db.execute(select(Product).where(Product.id == item.product_id))
+        product = prod_result.scalar_one_or_none()
+        
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+        if product.stock < item.quantity:
+            raise HTTPException(status_code=400, detail=f"Not enough stock for '{product.name}'")
+            
+        base_total += product.price * item.quantity
+        product_updates.append((product, item.quantity))
+
+    if user.personal_discount > 0:
+        base_total -= base_total * Decimal(str(user.personal_discount / 100))
+
+    promo = None
+    if request.promo_code:
+        promo_result = await db.execute(select(Promocode).where(Promocode.code == request.promo_code))
+        promo = promo_result.scalar_one_or_none()
+        if promo and promo.current_uses < promo.max_uses:
+            if promo.discount_type == DiscountType.PERCENTAGE:
+                base_total -= base_total * (promo.value / Decimal("100"))
+            elif promo.discount_type == DiscountType.FIXED:
+                base_total -= promo.value
+            
+            promo.current_uses += 1
+        else:
+            raise HTTPException(status_code=400, detail="Invalid or exhausted promo code")
+
+    final_total = max(Decimal("0.00"), base_total)
+
     new_order = Order(
-        user_id=telegram_id,
+        user_id=user.telegram_id,
         status=OrderStatus.PENDING,
-        total_price=order_in.total_price,
-        promo_code_used=order_in.promo_code,
-        address=order_in.address
+        total_price=final_total,
+        promo_code_used=request.promo_code if promo else None,
+        address=request.address
     )
     db.add(new_order)
-    await db.flush() # Получаем ID заказа
+    await db.flush() 
     
-    # Добавляем товары заказа
-    for item in order_in.items:
+    for item in request.items:
+        # Находим реальный товар из списка кэшированных
+        product_obj = next(p for p, _ in product_updates if p.id == item.product_id)
         db.add(OrderItem(
             order_id=new_order.id,
             product_id=item.product_id,
             quantity=item.quantity,
-            price_at_purchase=item.price
+            price_at_purchase=product_obj.price
         ))
         
     await db.commit()
     
-    # Уведомляем админа о создании
     if settings.admin_chat_id:
-        await notify_new_order(bot, settings.admin_chat_id, new_order.id, float(order_in.total_price))
+        try:
+            await notify_new_order(bot, settings.admin_chat_id, new_order.id, float(final_total))
+        except Exception:
+            pass # Не сбрасываем заказ, если бот заблокирован
         
     return {"status": "success", "order_id": new_order.id}
+
+@router.get("/my", response_model=List[OrderResponse])
+async def get_my_orders(
+    user_data: dict = Depends(verify_telegram_webapp_data),
+    db: AsyncSession = Depends(get_db)
+):
+    query = select(Order).where(
+        Order.user_id == user_data["id"]
+    ).order_by(desc(Order.created_at)).options(selectinload(Order.items))
+    
+    result = await db.execute(query)
+    return result.scalars().all()
 
 @router.patch("/{order_id}/status")
 async def change_order_status(order_id: int, new_status: OrderStatus, db: AsyncSession = Depends(get_db)):
