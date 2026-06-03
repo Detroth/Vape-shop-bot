@@ -5,10 +5,6 @@ from fastapi_amis_admin.admin.site import AdminSite
 from fastapi_amis_admin.admin.settings import Settings as AdminSettings
 from fastapi_amis_admin.admin import admin
 from sqlalchemy.types import String
-from pydantic import BaseModel, model_validator, ConfigDict
-from typing import Optional, Any
-from datetime import datetime
-from fastapi_amis_admin.models import Field
 
 # --- Исправление регистронезависимого поиска для PostgreSQL ---
 # fastapi-amis-admin по умолчанию использует метод .like() для текстовых полей в search_fields.
@@ -48,62 +44,11 @@ site = AdminSite(
     engine=engine
 )
 
-# --- Безопасные схемы с поддержкой пустых значений и связей ---
-class AmisSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    @model_validator(mode='before')
-    @classmethod
-    def clean_empty_strings(cls, values):
-        if isinstance(values, dict):
-            return {k: (None if v == "" else v) for k, v in values.items()}
-        return values
-
-class CategorySchema(AmisSchema):
-    id: int
-    name: str = Field(..., title="Название")
-
-class ProductSchema(AmisSchema):
-    id: int
-    category_id: int = Field(..., title="Категория", foreign_key="categories.id")
-    name: str = Field(..., title="Название")
-    description: Optional[str] = Field(None, title="Описание")
-    price: float = Field(..., title="Цена")
-    image_url: Optional[str] = Field(None, title="URL картинки")
-    stock: int = Field(0, title="Остаток")
-    characteristics: Optional[Any] = Field(None, title="Характеристики (JSON)")
-
-class OrderSchema(AmisSchema):
-    id: int
-    user_id: int = Field(..., title="ID Клиента", foreign_key="users.telegram_id")
-    status: str = Field(..., title="Статус")
-    total_price: float = Field(..., title="Сумма")
-    promo_code_used: Optional[str] = Field(None, title="Промокод")
-    address: Optional[str] = Field(None, title="Адрес")
-    created_at: Optional[datetime] = Field(None, title="Создан")
-
-class PromocodeSchema(AmisSchema):
-    id: int
-    code: str = Field(..., title="Код")
-    discount_type: str = Field(..., title="Тип скидки")
-    value: float = Field(..., title="Значение")
-    max_uses: int = Field(1, title="Макс. использований")
-    current_uses: int = Field(0, title="Использовано")
-
-class UserSchema(AmisSchema):
-    telegram_id: int = Field(..., title="Telegram ID")
-    username: Optional[str] = Field(None, title="Username")
-    balance: float = Field(0.0, title="Баланс")
-    bonus_points: int = Field(0, title="Бонусы")
-    personal_discount: int = Field(0, title="Скидка (%)")
-
 @site.register_admin
 class CategoryAdmin(admin.ModelAdmin):
     page_schema = "Категории"
     label = "Категории"
     model = Category
-    schema = CategorySchema
-    schema_model = CategorySchema
     search_fields = [Category.name]
 
 @site.register_admin
@@ -111,8 +56,6 @@ class ProductAdmin(admin.ModelAdmin):
     page_schema = "Товары"
     label = "Товары"
     model = Product
-    schema = ProductSchema
-    schema_model = ProductSchema
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
@@ -132,8 +75,6 @@ class OrderAdmin(admin.ModelAdmin):
     page_schema = "Заказы"
     label = "Заказы"
     model = Order
-    schema = OrderSchema
-    schema_model = OrderSchema
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
@@ -158,8 +99,6 @@ class PromocodeAdmin(admin.ModelAdmin):
     page_schema = "Промокоды"
     label = "Промокоды"
     model = Promocode
-    schema = PromocodeSchema
-    schema_model = PromocodeSchema
     search_fields = [Promocode.code]
     
     async def get_list_table(self, request):
@@ -178,8 +117,6 @@ class UserAdmin(admin.ModelAdmin):
     label = "Пользователи"
     model = User
     pk_name = "telegram_id"
-    schema = UserSchema
-    schema_model = UserSchema
     search_fields = [User.username, User.telegram_id]
     
     async def get_list_table(self, request):
