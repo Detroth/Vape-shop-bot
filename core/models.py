@@ -30,7 +30,7 @@ class User(Base):
 
     # telegram_id может быть большим числом, поэтому используем BigInteger
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    username: Mapped[Optional[str]] = mapped_column(String(255))
+    username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, default=None)
     balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
     bonus_points: Mapped[int] = mapped_column(Integer, default=0)
     personal_discount: Mapped[int] = mapped_column(Integer, default=0) # в %
@@ -53,13 +53,13 @@ class Product(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(255))
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    image_url: Mapped[Optional[str]] = mapped_column(String(512))
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, default=None)
     stock: Mapped[int] = mapped_column(Integer, default=0)
     
     # JSON поле для характеристик (например, {"flavor": "apple", "nicotine": "2%"})
-    characteristics: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
+    characteristics: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True, default=None)
 
     category: Mapped["Category"] = relationship(back_populates="products", lazy="selectin")
     order_items: Mapped[List["OrderItem"]] = relationship(back_populates="product")
@@ -74,8 +74,8 @@ class Order(Base):
     total_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     
     # Ссылка на промокод строкой, чтобы при удалении промокода из БД история заказов не сломалась
-    promo_code_used: Mapped[Optional[str]] = mapped_column(String(50))
-    address: Mapped[Optional[str]] = mapped_column(Text)
+    promo_code_used: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     
     # Автоматическое проставление времени при создании записи
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -89,7 +89,7 @@ class OrderItem(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"))
-    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"))
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True, default=None)
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     
     # Важное поле: сохраняем цену на момент покупки на случай, если цена товара изменится в будущем
