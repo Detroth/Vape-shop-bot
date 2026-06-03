@@ -1,4 +1,5 @@
 import asyncio
+import re
 import logging
 import uvicorn
 from contextlib import asynccontextmanager
@@ -27,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Маскируем пароль для безопасного вывода в логи
-    safe_url = settings.database_url.replace(settings.db_pass, "******") if settings.db_pass else settings.database_url
+    # Маскируем пароль регулярным выражением для безопасного вывода в логи
+    safe_url = re.sub(r":([^:@]+)@", r":******@", settings.database_url)
     logger.info(f"Попытка подключения к БД по адресу: {safe_url}")
     
     logger.info("Инициализация базы данных...")
