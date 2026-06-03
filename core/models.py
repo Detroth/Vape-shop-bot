@@ -70,7 +70,7 @@ class Order(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"))
-    status: Mapped[OrderStatus] = mapped_column(SQLEnum(OrderStatus), default=OrderStatus.PENDING)
+    status: Mapped[OrderStatus] = mapped_column(SQLEnum(OrderStatus, name="order_status_enum"), default=OrderStatus.PENDING)
     total_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     
     # Ссылка на промокод строкой, чтобы при удалении промокода из БД история заказов не сломалась
@@ -104,7 +104,7 @@ class Promocode(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(50), unique=True)
-    discount_type: Mapped[DiscountType] = mapped_column(SQLEnum(DiscountType))
+    discount_type: Mapped[DiscountType] = mapped_column(SQLEnum(DiscountType, name="discount_type_enum"))
     value: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     max_uses: Mapped[int] = mapped_column(Integer, default=1)
     current_uses: Mapped[int] = mapped_column(Integer, default=0)

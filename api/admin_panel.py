@@ -6,6 +6,13 @@ from fastapi_amis_admin.admin.settings import Settings as AdminSettings
 from fastapi_amis_admin.admin import admin
 from pydantic import BaseModel, model_validator
 from typing import Optional, Any
+from sqlalchemy.types import String
+
+# --- Исправление регистронезависимого поиска для PostgreSQL ---
+# fastapi-amis-admin по умолчанию использует метод .like() для текстовых полей в search_fields.
+# В PostgreSQL оператор LIKE чувствителен к регистру (в отличие от MySQL). 
+# Чтобы поиск работал корректно, мы глобально переопределяем поведение like на ilike для строк:
+String.Comparator.like = String.Comparator.ilike
 
 from core.models import User, Category, Product, Order, Promocode
 from core.config import settings
@@ -114,6 +121,7 @@ class CategoryAdmin(admin.ModelAdmin):
     schema = CategorySchema
     schema_create = CategoryCreate
     schema_update = CategoryCreate
+    search_fields = [Category.name]
 
 @site.register_admin
 class ProductAdmin(admin.ModelAdmin):
@@ -172,6 +180,7 @@ class PromocodeAdmin(admin.ModelAdmin):
     schema = PromocodeSchema
     schema_create = PromocodeCreate
     schema_update = PromocodeCreate
+    search_fields = [Promocode.code]
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
