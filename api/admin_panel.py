@@ -5,7 +5,7 @@ from fastapi_amis_admin.admin.site import AdminSite
 from fastapi_amis_admin.admin.settings import Settings as AdminSettings
 from fastapi_amis_admin.admin import admin
 from sqlalchemy.types import String
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, ConfigDict
 from typing import Optional, Any
 from datetime import datetime
 from fastapi_amis_admin.models import Field
@@ -50,33 +50,21 @@ site = AdminSite(
 
 # --- Безопасные схемы с поддержкой пустых значений и связей ---
 class AmisSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     @model_validator(mode='before')
     @classmethod
     def clean_empty_strings(cls, values):
         if isinstance(values, dict):
-            for k, v in values.items():
-                if v == "":
-                    values[k] = None
+            return {k: (None if v == "" else v) for k, v in values.items()}
         return values
 
 class CategorySchema(AmisSchema):
     id: int
     name: str = Field(..., title="Название")
 
-class CategoryCreate(AmisSchema):
-    name: str = Field(..., title="Название")
-
 class ProductSchema(AmisSchema):
     id: int
-    category_id: int = Field(..., title="Категория", foreign_key="categories.id")
-    name: str = Field(..., title="Название")
-    description: Optional[str] = Field(None, title="Описание")
-    price: float = Field(..., title="Цена")
-    image_url: Optional[str] = Field(None, title="URL картинки")
-    stock: int = Field(0, title="Остаток")
-    characteristics: Optional[Any] = Field(None, title="Характеристики (JSON)")
-
-class ProductCreate(AmisSchema):
     category_id: int = Field(..., title="Категория", foreign_key="categories.id")
     name: str = Field(..., title="Название")
     description: Optional[str] = Field(None, title="Описание")
@@ -102,13 +90,6 @@ class PromocodeSchema(AmisSchema):
     max_uses: int = Field(1, title="Макс. использований")
     current_uses: int = Field(0, title="Использовано")
 
-class PromocodeCreate(AmisSchema):
-    code: str = Field(..., title="Код")
-    discount_type: str = Field(..., title="Тип скидки")
-    value: float = Field(..., title="Значение")
-    max_uses: int = Field(1, title="Макс. использований")
-    current_uses: int = Field(0, title="Использовано")
-
 class UserSchema(AmisSchema):
     telegram_id: int = Field(..., title="Telegram ID")
     username: Optional[str] = Field(None, title="Username")
@@ -122,8 +103,7 @@ class CategoryAdmin(admin.ModelAdmin):
     label = "Категории"
     model = Category
     schema = CategorySchema
-    schema_create = CategoryCreate
-    schema_update = CategoryCreate
+    schema_model = CategorySchema
     search_fields = [Category.name]
 
 @site.register_admin
@@ -132,8 +112,7 @@ class ProductAdmin(admin.ModelAdmin):
     label = "Товары"
     model = Product
     schema = ProductSchema
-    schema_create = ProductCreate
-    schema_update = ProductCreate
+    schema_model = ProductSchema
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
@@ -154,8 +133,7 @@ class OrderAdmin(admin.ModelAdmin):
     label = "Заказы"
     model = Order
     schema = OrderSchema
-    schema_create = OrderSchema
-    schema_update = OrderSchema
+    schema_model = OrderSchema
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
@@ -181,8 +159,7 @@ class PromocodeAdmin(admin.ModelAdmin):
     label = "Промокоды"
     model = Promocode
     schema = PromocodeSchema
-    schema_create = PromocodeCreate
-    schema_update = PromocodeCreate
+    schema_model = PromocodeSchema
     search_fields = [Promocode.code]
     
     async def get_list_table(self, request):
@@ -202,8 +179,7 @@ class UserAdmin(admin.ModelAdmin):
     model = User
     pk_name = "telegram_id"
     schema = UserSchema
-    schema_create = UserSchema
-    schema_update = UserSchema
+    schema_model = UserSchema
     search_fields = [User.username, User.telegram_id]
     
     async def get_list_table(self, request):
