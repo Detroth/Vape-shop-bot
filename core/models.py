@@ -35,7 +35,7 @@ class User(Base):
     bonus_points: Mapped[int] = mapped_column(Integer, default=0)
     personal_discount: Mapped[int] = mapped_column(Integer, default=0) # в %
 
-    orders: Mapped[List["Order"]] = relationship(back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    orders: Mapped[List["Order"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Category(Base):
@@ -44,7 +44,7 @@ class Category(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
 
-    products: Mapped[List["Product"]] = relationship(back_populates="category", cascade="all, delete-orphan", lazy="selectin")
+    products: Mapped[List["Product"]] = relationship(back_populates="category", cascade="all, delete-orphan")
 
 
 class Product(Base):
@@ -62,7 +62,7 @@ class Product(Base):
     characteristics: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
 
     category: Mapped["Category"] = relationship(back_populates="products", lazy="selectin")
-    order_items: Mapped[List["OrderItem"]] = relationship(back_populates="product", lazy="selectin")
+    order_items: Mapped[List["OrderItem"]] = relationship(back_populates="product")
 
 
 class Order(Base):
@@ -81,7 +81,7 @@ class Order(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="orders", lazy="selectin")
-    items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan", lazy="selectin")
+    items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
