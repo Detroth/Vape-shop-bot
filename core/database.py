@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import DeclarativeBase
 from core.config import settings
 
-engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+# Включаем echo=True для дебага: теперь в логах Railway вы увидите ВСЕ SQL-запросы, включая CREATE TABLE
+engine = create_async_engine(settings.database_url, echo=True, pool_pre_ping=True)
 
 async_session_maker = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
@@ -16,7 +17,10 @@ async def init_db():
     """Создает таблицы в базе данных при старте."""
     # Импорт внутри функции позволяет избежать циклических зависимостей
     from core.models import User, Category, Product, Order, OrderItem, Promocode
+    
     async with engine.begin() as conn:
+        # Логируем зарегистрированные модели, чтобы убедиться, что они видны SQLAlchemy
+        print(f"🛠 Зарегистрированные таблицы для создания: {list(Base.metadata.tables.keys())}")
         await conn.run_sync(Base.metadata.create_all)
 
 async def setup_initial_database(session: AsyncSession):

@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from aiogram.client.default import DefaultBotProperties
 
 from core.config import settings
-from core.database import init_db, engine, async_session_maker, setup_initial_database
+from core.database import init_db, engine, async_session_maker, setup_initial_database, Base
+from sqlalchemy import text
 from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
 from api.admin_panel import setup_admin
@@ -85,6 +86,19 @@ dp.include_router(admin_router)
 async def health_check():
     """Простейший эндпоинт для проверки жизнеспособности (Railway healthcheck)."""
     return {"status": "ok"}
+
+@app.get("/db-status", tags=["System"])
+async def db_status_check():
+    """Диагностический эндпоинт для проверки реального состояния базы данных."""
+    try:
+        async with engine.connect() as conn:
+            # Запрашиваем у самого PostgreSQL список реально существующих таблиц
+            result = await conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public';"))
+            tables = [row[0] for row in result.fetchall()]
+            
+            return {"status": "ok", "tables_in_postgres": tables, "models_in_app": list(Base.metadata.tables.keys())}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 @app.get("/", include_in_schema=False)
 async def root():
