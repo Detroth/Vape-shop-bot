@@ -5,6 +5,9 @@ from fastapi_amis_admin.admin.site import AdminSite
 from fastapi_amis_admin.admin.settings import Settings as AdminSettings
 from fastapi_amis_admin.admin import admin
 from sqlalchemy.types import String
+from pydantic import BaseModel, ConfigDict
+from typing import Optional, Any
+from datetime import datetime
 
 # --- Исправление регистронезависимого поиска для PostgreSQL ---
 # fastapi-amis-admin по умолчанию использует метод .like() для текстовых полей в search_fields.
@@ -44,6 +47,36 @@ site = AdminSite(
     engine=engine
 )
 
+# --- Схемы только для ЧТЕНИЯ из БД (чтобы избежать ValidationError при None) ---
+class ProductRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    category_id: int
+    name: str
+    description: Optional[str] = None
+    price: float
+    image_url: Optional[str] = None
+    stock: int
+    characteristics: Optional[Any] = None
+
+class OrderRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    user_id: int
+    status: str
+    total_price: float
+    promo_code_used: Optional[str] = None
+    address: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    telegram_id: int
+    username: Optional[str] = None
+    balance: float
+    bonus_points: int
+    personal_discount: int
+
 @site.register_admin
 class CategoryAdmin(admin.ModelAdmin):
     page_schema = "Категории"
@@ -56,6 +89,8 @@ class ProductAdmin(admin.ModelAdmin):
     page_schema = "Товары"
     label = "Товары"
     model = Product
+    schema = ProductRead
+    schema_model = ProductRead
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
@@ -75,6 +110,8 @@ class OrderAdmin(admin.ModelAdmin):
     page_schema = "Заказы"
     label = "Заказы"
     model = Order
+    schema = OrderRead
+    schema_model = OrderRead
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
@@ -117,6 +154,8 @@ class UserAdmin(admin.ModelAdmin):
     label = "Пользователи"
     model = User
     pk_name = "telegram_id"
+    schema = UserRead
+    schema_model = UserRead
     search_fields = [User.username, User.telegram_id]
     
     async def get_list_table(self, request):
