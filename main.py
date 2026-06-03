@@ -32,11 +32,14 @@ async def lifespan(app: FastAPI):
     logger.info(f"Попытка подключения к БД по адресу: {safe_url}")
     
     logger.info("Инициализация базы данных...")
-    await init_db()
-    
-    logger.info("Проверка и наполнение начальными данными...")
-    async with async_session_maker() as session:
-        await setup_initial_database(session)
+    try:
+        await init_db()
+        
+        logger.info("Проверка и наполнение начальными данными...")
+        async with async_session_maker() as session:
+            await setup_initial_database(session)
+    except Exception as e:
+        logger.error(f"❌ Критическая ошибка при инициализации БД: {e}")
         
     logger.info("Запуск Telegram-бота в фоновом режиме (polling)...")
     # Запускаем polling бота параллельно с FastAPI сервером

@@ -21,14 +21,15 @@ class Settings(BaseSettings):
     admin_password: str = Field("admin", description="Пароль админ-панели")
     admin_secret_key: str = Field("secret", description="Секретный ключ для куки сессий")
     
-    @field_validator("database_url")
+    @field_validator("database_url", mode="before")
     @classmethod
     def fix_postgres_url(cls, v: str) -> str:
         # Railway выдает стандартную ссылку postgresql://..., но для асинхронной SQLAlchemy нужен asyncpg
-        if v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        if v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        if isinstance(v, str):
+            if v.startswith("postgresql://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
         return v
 
     model_config = SettingsConfigDict(
