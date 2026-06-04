@@ -69,8 +69,6 @@ app.add_middleware(
 # Регистрация эндпоинтов Mini App
 app.include_router(api_router, prefix="/api")
 
-app.mount("/store", StaticFiles(directory="web", html=True), name="store")
-
 # Инициализация современной админ-панели (FastAPI Amis Admin)
 setup_admin(app)
 
@@ -100,10 +98,8 @@ async def db_status_check():
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-@app.get("/", include_in_schema=False)
-async def root():
-    """Перенаправляет посетителей с корня сайта в Mini App магазин."""
-    return RedirectResponse(url="/store/")
+# Монтируем статику в корень (ДОЛЖНО БЫТЬ В САМОМ НИЗУ, чтобы не перекрыть /api и /admin)
+app.mount("/", StaticFiles(directory="web", html=True), name="web")
 
 if __name__ == "__main__":
     # Передаем объект app напрямую, чтобы избежать двойного импорта файла и ошибки "Router is already attached"
