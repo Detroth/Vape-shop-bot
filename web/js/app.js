@@ -7,8 +7,10 @@ tg.ready();
 const appState = {
     profile: null,
     products: [], 
+    categories: [],
+    activeCategoryId: null,
     cart: JSON.parse(localStorage.getItem('vape_cart') || '{}'),
-    favorites: new Set(), 
+    favorites: new Set(JSON.parse(localStorage.getItem('vape_favorites') || '[]')), 
     currentTab: 'catalog',
     activeProduct: null,
     promoCode: null
@@ -16,6 +18,50 @@ const appState = {
 
 // Динамическое получение данных (на случай если Telegram загрузится с задержкой)
 const getInitData = () => window.Telegram.WebApp.initData || "test";
+
+// --- ГЛОБАЛЬНАЯ ОБЕРТКА ДЛЯ API ЗАПРОСОВ ---
+async function apiFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    // Автоматически прикрепляем данные для авторизации к каждому запросу
+    headers.set('X-Telegram-Init-Data', getInitData());
+    headers.set('Authorization', `Bearer ${getInitData()}`); // Дублируем для надежности
+    
+    return fetch(url, { ...options, headers });
+}
+
+// --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ И АВТОРИЗАЦИЯ ---
+async function initializeApp() {
+    const initDataStr = window.Telegram.WebApp.initData;
+    
+    if (!initDataStr) {
+        console.warn("⚠️ Приложение запущено вне Telegram! Используется тестовая моковая строка initData.");
+    }
+
+    try {
+        // Обращаемся к новому эндпоинту авторизации
+        const response = await apiFetch('/api/auth/login', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const userData = await response.json();
+            
+            // Сохраняем глобально
+            window.currentUser = userData;
+            appState.profile = userData;
+            
+            // Сразу обновляем интерфейс
+            renderProfile(userData);
+            
+            // Если есть лоадер, здесь его можно скрыть: document.getElementById('loader')?.classList.add('hidden');
+            switchTab('catalog');
+        } else {
+            console.error("Ошибка авторизации. Статус:", response.status);
+        }
+    } catch (error) {
+        console.error("Сетевая ошибка при инициализации приложения:", error);
+    }
+}
 
 // Моментальное обновление визуала профиля из клиента Telegram
 function renderProfileHeader(dbUser = null) {
@@ -54,8 +100,8 @@ function switchTab(tabName) {
         renderCart();
     }
     
-    if (tabName === 'profile') {
-        loadUserProfile();
+    if (tabName === 'profile' && window.currentUser) {
+        renderProfile(window.currentUser);
     }
 
     // 3. Обновляем цвета кнопок в навигации
@@ -75,18 +121,54 @@ function switchTab(tabName) {
 
 // --- ЛОГИКА КАТАЛОГА И ТОВАРОВ ---
 
-async function fetchProducts() {
+async function fetchCategories() {
     try {
-        const response = await fetch('/api/catalog/products', {
-            headers: { 'X-Telegram-Init-Data': getInitData() }
-        });
+        const response = await apiFetch('/api/catalog/categories');
+        if (response.ok) {
+            appState.categories = await response.json();
+            renderCategories();
+        }
+    } catch (error) {
+        console.error("Ошибка загрузки категорий:", error);
+    }
+}
+
+function renderCategories() {
+    const container = document.getElementById('categories-container');
+    if (!container) return;
+    
+    // Кнопка "Все"
+    let html = `<button onclick="selectCategory(null)" class="px-4 py-1.5 rounded-full whitespace-nowrap transition-colors ${appState.activeCategoryId === null ? 'bg-app-accent text-white font-medium shadow-md shadow-blue-500/20' : 'bg-app-card text-app-muted border border-white/5 hover:text-white'}">Все</button>`;
+    
+    // Кнопки категорий из БД
+    appState.categories.forEach(c => {
+        const isActive = appState.activeCategoryId === c.id;
+        html += `<button onclick="selectCategory(${c.id})" class="px-4 py-1.5 rounded-full whitespace-nowrap transition-colors ${isActive ? 'bg-app-accent text-white font-medium shadow-md shadow-blue-500/20' : 'bg-app-card text-app-muted border border-white/5 hover:text-white'}">${c.name}</button>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+function selectCategory(id) {
+    appState.activeCategoryId = id;
+    tg.HapticFeedback.selectionChanged();
+    renderCategories();
+    handleSearch(); // Запускаем поиск (уже с учетом выбранной категории)
+}
+
+async function fetchProducts(categoryId = null, search = '') {
+    try {
+        const params = new URLSearchParams();
+        if (categoryId !== null) params.append('category_id', categoryId);
+        if (search) params.append('search', search);
+        
+        const url = '/api/catalog/products' + (params.toString() ? `?${params.toString()}` : '');
+        const response = await apiFetch(url);
+        
         if (response.ok) {
             appState.products = await response.json();
         } else {
-            appState.products = [
-                { id: 1, name: "GeekVape Aegis Q 0.8 Om", price: 13, image_url: "https://placehold.co/200x200/ffffff/000000?text=Aegis", characteristics: { colors: ["Black", "Red"] }, description: "Сменный картридж для подсистемы." },
-                { id: 2, name: "Vaporesso Xros 3mini", price: 60, image_url: "https://placehold.co/200x200/ffffff/000000?text=XROS+3", characteristics: { colors: ["Lemon Yellow (желтый)", "Space Grey", "Phantom Green"] }, description: "Компактная и мощная подсистема с емким аккумулятором." }
-            ];
+            appState.products = [];
         }
         renderProducts(appState.products);
         updateCartBadges(); // Обновляем бейджи после загрузки, т.к. корзина тянется из localStorage
@@ -136,10 +218,13 @@ function renderProducts(productsToRender) {
     });
 }
 
+let searchTimeout;
 function handleSearch() {
-    const query = document.getElementById('catalog-search').value.toLowerCase();
-    const filtered = appState.products.filter(p => p.name.toLowerCase().includes(query));
-    renderProducts(filtered);
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        const query = document.getElementById('catalog-search').value.trim();
+        fetchProducts(appState.activeCategoryId, query);
+    }, 300); // 300мс задержка после последнего нажатия
 }
 
 // --- ЛОГИКА ДЕТАЛЬНОГО ЭКРАНА ТОВАРА ---
@@ -188,27 +273,20 @@ function closeProductDetails() {
 }
 
 // --- ЛОГИКА ПРОФИЛЯ ---
-async function loadUserProfile() {
-    try {
-        tg.ready(); // Синхронизация с клиентом Telegram
-        const url = `/api/user/profile?t=${Date.now()}`; // Очистка кэша браузера
-        const res = await fetch(url, { headers: { 'X-Telegram-Init-Data': getInitData() } });
-        if(res.ok) {
-            appState.profile = await res.json();
-            
-            const balEl = document.getElementById('profile-balance');
-            if (balEl) balEl.textContent = `${appState.profile.balance} Br`;
-            
-            const bonEl = document.getElementById('profile-bonuses');
-            if (bonEl) bonEl.textContent = `${appState.profile.bonus_points} pts`;
-            
-            const discEl = document.getElementById('profile-discount');
-            if (discEl) discEl.textContent = `${appState.profile.personal_discount}%`;
-            
-            // Обновляем шапку, подтянув данные из базы
-            renderProfileHeader(appState.profile);
-        }
-    } catch (e) { console.error("Ошибка загрузки профиля", e); }
+function renderProfile(userData) {
+    if (!userData) return;
+    
+    const balEl = document.getElementById('profile-balance');
+    if (balEl) balEl.textContent = `${userData.balance} Br`;
+    
+    const bonEl = document.getElementById('profile-bonuses');
+    if (bonEl) bonEl.textContent = `${userData.bonus_points} pts`;
+    
+    const discEl = document.getElementById('profile-discount');
+    if (discEl) discEl.textContent = `${userData.personal_discount}%`;
+    
+    // Обновляем шапку, подтянув данные из базы
+    renderProfileHeader(userData);
 }
 
 async function fetchOrders() {
@@ -306,9 +384,9 @@ async function validateCartOnBackend() {
     if (items.length === 0) return;
 
     try {
-        const res = await fetch('/api/cart/validate', {
+        const res = await apiFetch('/api/cart/validate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': getInitData() },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items, promo_code: appState.promoCode })
         });
         if (res.ok) {
@@ -377,9 +455,9 @@ async function checkout() {
     
     const items = Object.entries(appState.cart).map(([id, qty]) => ({ product_id: parseInt(id), quantity: qty }));
     try {
-        const res = await fetch('/api/orders/create', {
+        const res = await apiFetch('/api/orders/create', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': getInitData() },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items, promo_code: appState.promoCode, address: "Самовывоз" })
         });
         if (res.ok) {
@@ -387,7 +465,8 @@ async function checkout() {
             appState.cart = {};
             appState.promoCode = null;
             saveCart();
-            loadUserProfile(); // Обновляем профиль (баланс, скидки и др.)
+            // Заново логинимся/обновляемся, чтобы подтянуть с бэка списанный баланс/бонусы
+            initializeApp(); 
             switchTab('catalog');
         } else { tg.showAlert("Ошибка при оформлении заказа"); }
     } catch (e) { tg.showAlert("Ошибка сети"); }
@@ -400,14 +479,18 @@ function toggleFavorite(productId) {
     } else {
         appState.favorites.add(productId);
     }
-    // Перерисовываем каталог для обновления иконки сердечка
-    handleSearch(); 
+    
+    // Сохраняем в память телефона
+    localStorage.setItem('vape_favorites', JSON.stringify([...appState.favorites]));
+    
+    tg.HapticFeedback.impactOccurred('light');
+    renderProducts(appState.products); // Перерисовываем карточки для обновления заливки сердечка
 }
 
 // Запуск
 document.addEventListener('DOMContentLoaded', () => {
     renderProfileHeader(); // Моментально показываем имя из Telegram
-    switchTab('catalog');
+    initializeApp(); // Авторизация и загрузка профиля
+    fetchCategories();
     fetchProducts();
-    loadUserProfile(); // Сразу при входе грузим профиль
 });
