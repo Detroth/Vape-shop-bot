@@ -13,9 +13,13 @@ for (let key in storedCart) {
     }
 }
 
+// Утилита для строгого форматирования цен (всегда 2 знака после запятой)
+const formatPrice = (num) => Number(num || 0).toFixed(2);
+
 // Глобальное состояние
 const appState = {
     profile: null,
+    allProducts: [], // Храним все товары для мгновенного поиска
     products: [], 
     categories: [],
     activeCategoryId: null,
@@ -76,6 +80,19 @@ async function initializeApp() {
     }
 }
 
+// Отдельная функция для обновления данных профиля в фоне
+async function loadUserProfile() {
+    try {
+        const response = await apiFetch('/api/user/profile');
+        if (response.ok) {
+            const userData = await response.json();
+            window.currentUser = userData;
+            appState.profile = userData;
+            renderProfile(userData);
+        }
+    } catch (error) { console.error("Ошибка обновления профиля", error); }
+}
+
 // Моментальное обновление визуала профиля из клиента Telegram
 function renderProfileHeader(dbUser = null) {
     const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
@@ -113,8 +130,9 @@ function switchTab(tabName) {
         renderCart();
     }
     
-    if (tabName === 'profile' && window.currentUser) {
-        renderProfile(window.currentUser);
+    if (tabName === 'profile') {
+        if (window.currentUser) renderProfile(window.currentUser); // Показываем сразу из кэша
+        loadUserProfile(); // Параллельно тянем свежие данные (баланс)
     }
 
     // 3. Обновляем цвета кнопок в навигации
@@ -166,28 +184,41 @@ function selectCategory(id) {
     appState.activeCategoryId = id;
     tg.HapticFeedback.selectionChanged();
     renderCategories();
-    handleSearch(); // Запускаем поиск (уже с учетом выбранной категории)
+    filterAndRenderProducts(); // Мгновенная фильтрация на клиенте
 }
 
-async function fetchProducts(categoryId = null, search = '') {
+async function fetchProducts() {
     try {
-        const params = new URLSearchParams();
-        if (categoryId !== null) params.append('category_id', categoryId);
-        if (search) params.append('search', search);
-        
-        const url = '/api/catalog/products' + (params.toString() ? `?${params.toString()}` : '');
-        const response = await apiFetch(url);
+        const response = await apiFetch('/api/catalog/products');
         
         if (response.ok) {
-            appState.products = await response.json();
+            appState.allProducts = await response.json();
         } else {
-            appState.products = [];
+            appState.allProducts = [];
         }
-        renderProducts(appState.products);
+        filterAndRenderProducts();
         updateCartBadges(); // Обновляем бейджи после загрузки, т.к. корзина тянется из localStorage
     } catch (error) {
         console.error("Ошибка загрузки товаров:", error);
     }
+}
+
+function filterAndRenderProducts() {
+    let filtered = appState.allProducts;
+    
+    // Фильтр по категории
+    if (appState.activeCategoryId !== null) {
+        filtered = filtered.filter(p => p.category_id === appState.activeCategoryId);
+    }
+    
+    // Фильтр по поиску
+    const query = document.getElementById('catalog-search').value.trim().toLowerCase();
+    if (query) {
+        filtered = filtered.filter(p => p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query)));
+    }
+    
+    appState.products = filtered;
+    renderProducts(filtered);
 }
 
 function renderProducts(productsToRender) {
@@ -201,8 +232,6 @@ function renderProducts(productsToRender) {
     let html = '';
     productsToRender.forEach(p => {
         const isFav = appState.favorites.has(p.id);
-        const hasVariants = p.characteristics?.variants?.length > 0 || p.characteristics?.colors?.length > 0;
-        const btnAction = hasVariants ? `showProductDetails(${p.id})` : `addToCart(${p.id})`;
         
         html += `
         <div class="bg-app-card rounded-2xl p-2 flex flex-col relative cursor-pointer active:scale-95 transition-transform border border-white/5" onclick="showProductDetails(${p.id})">
@@ -213,11 +242,8 @@ function renderProducts(productsToRender) {
                 </button>
             </div>
             <h2 class="text-[13px] font-medium mb-2 line-clamp-2 leading-snug flex-1">${p.name}</h2>
-            <div class="mt-auto flex justify-between items-center">
-                <span class="font-bold text-[14px] text-app-accent leading-none">${Number(p.price).toFixed(2)} Br</span>
-                <button onclick="event.stopPropagation(); ${btnAction}" class="bg-app-accent text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md shadow-blue-500/20 hover:bg-blue-500 transition-colors">
-                    Купить
-                </button>
+            <div class="mt-auto">
+                <span class="font-bold text-[15px] text-app-accent leading-none">${formatPrice(p.price)} Br</span>
             </div>
         </div>`;
     });
@@ -228,9 +254,8 @@ let searchTimeout;
 function handleSearch() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-        const query = document.getElementById('catalog-search').value.trim();
-        fetchProducts(appState.activeCategoryId, query);
-    }, 300); // 300мс задержка после последнего нажатия
+        filterAndRenderProducts();
+    }, 150); // Снизили задержку: фильтрация мгновенная
 }
 
 // --- ЛОГИКА ДЕТАЛЬНОГО ЭКРАНА ТОВАРА ---
@@ -299,7 +324,7 @@ function renderProfile(userData) {
     if (!userData) return;
     
     const balEl = document.getElementById('profile-balance');
-    if (balEl) balEl.textContent = `${Number(userData.balance).toFixed(2)} Br`;
+    if (balEl) balEl.textContent = `${formatPrice(userData.balance)} Br`;
     
     const bonEl = document.getElementById('profile-bonuses');
     if (bonEl) bonEl.textContent = `${userData.bonus_points} pts`;
@@ -362,7 +387,7 @@ function renderOrdersList(orders) {
             const variantText = i.variant ? ` <span class="text-app-accent text-[10px]">(${i.variant})</span>` : '';
             return `<div class="text-[13px] text-gray-300 flex justify-between mb-1 items-center">
                         <span class="flex-1">- ${product.name}${variantText} <span class="text-white font-bold ml-1">x${i.quantity}</span></span>
-                        <span>${Number(i.price_at_purchase * i.quantity).toFixed(2)} Br</span>
+                        <span>${formatPrice(i.price_at_purchase * i.quantity)} Br</span>
                     </div>`;
         }).join('');
         
@@ -381,7 +406,7 @@ function renderOrdersList(orders) {
                 ${o.promo_code_used ? `<div class="text-xs text-app-accent mb-2">Применен промокод: ${o.promo_code_used}</div>` : ''}
                 <div class="flex justify-between items-center mt-3 pt-3 border-t border-white/5">
                     <span class="text-sm text-app-muted">Итоговая сумма:</span>
-                    <span class="font-bold text-app-accent text-lg">${Number(o.total_price).toFixed(2)} Br</span>
+                    <span class="font-bold text-app-accent text-lg">${formatPrice(o.total_price)} Br</span>
                 </div>
             </div>
         `;
@@ -473,14 +498,14 @@ async function renderCart() {
             <div class="flex-1 min-w-0">
                 <div class="font-medium text-sm truncate mb-1">${product.name}</div>
                 ${variantHtml}
-                    <div class="text-xs text-app-muted mb-2">Цена/шт ${Number(product.price).toFixed(2)} Br</div>
+                    <div class="text-xs text-app-muted mb-2">Цена/шт ${formatPrice(product.price)} Br</div>
                 <div class="flex justify-between items-center">
                     <div class="flex items-center gap-3 bg-app-bg px-2 py-1 rounded-lg border border-white/5">
                         <button onclick='updateCartQuantity("${key}", -1)' class="text-app-muted hover:text-white px-1 font-bold">-</button>
                         <span class="text-xs font-semibold w-5 text-center">${item.quantity}</span>
                         <button onclick='updateCartQuantity("${key}", 1)' class="text-app-muted hover:text-white px-1 font-bold">+</button>
                     </div>
-                        <div class="text-sm font-bold text-app-accent">${Number(product.price * item.quantity).toFixed(2)} Br</div>
+                        <div class="text-sm font-bold text-app-accent">${formatPrice(product.price * item.quantity)} Br</div>
                 </div>
             </div>
             <button onclick='removeFromCart("${key}")' class="shrink-0 w-10 h-10 bg-red-500/10 text-red-400 rounded-xl flex items-center justify-center hover:bg-red-500/20 transition-colors">
@@ -491,8 +516,8 @@ async function renderCart() {
     
     itemsContainer.innerHTML = html;
 
-    document.getElementById('cart-subtotal').textContent = `${localSubtotal.toFixed(2)} Br`;
-    document.getElementById('cart-total').textContent = `${localSubtotal.toFixed(2)} Br`;
+    document.getElementById('cart-subtotal').textContent = `${formatPrice(localSubtotal)} Br`;
+    document.getElementById('cart-total').textContent = `${formatPrice(localSubtotal)} Br`;
     
     // Запрашиваем валидацию с сервера асинхронно
     validateCartOnBackend();
@@ -510,12 +535,12 @@ async function validateCartOnBackend() {
         });
         if (res.ok) {
             const data = await res.json();
-            document.getElementById('cart-total').textContent = `${Number(data.final_total).toFixed(2)} Br`;
+            document.getElementById('cart-total').textContent = `${formatPrice(data.final_total)} Br`;
             
             const discRow = document.getElementById('cart-discount-row');
             if (data.discount_amount > 0) {
                 discRow.classList.remove('hidden');
-                document.getElementById('cart-discount-val').textContent = `-${Number(data.discount_amount).toFixed(2)} Br`;
+                document.getElementById('cart-discount-val').textContent = `-${formatPrice(data.discount_amount)} Br`;
                 document.getElementById('cart-discount-label').textContent = data.promo_status === 'valid' ? 'Скидка (промо)' : 'Скидка';
             } else {
                 discRow.classList.add('hidden');
@@ -603,7 +628,7 @@ async function submitDeposit() {
         if (res.ok) {
             tg.showPopup({ title: "Успех!", message: `Счет успешно пополнен на ${amount} Br`, buttons: [{text: "OK"}]});
             closeDepositModal();
-            initializeApp(); // Автоматически запрашиваем обновленный профиль с бэкенда!
+            loadUserProfile(); // Легкое обновление профиля без моргания экрана!
         } else {
             tg.showAlert("Ошибка при попытке пополнения");
         }
@@ -634,8 +659,8 @@ async function checkout() {
             appState.cart = {};
             appState.promoCode = null;
             saveCart();
-            // Заново логинимся/обновляемся, чтобы подтянуть с бэка списанный баланс/бонусы
-            initializeApp(); 
+            
+            await loadUserProfile(); // Легкое обновление профиля, чтобы подтянуть списанный баланс
             
             // Перекидываем пользователя на экран Профиля и сразу открываем Историю заказов
             switchTab('profile');
