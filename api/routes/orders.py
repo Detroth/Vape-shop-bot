@@ -66,9 +66,17 @@ async def create_order(
 
     final_total = max(Decimal("0.00"), base_total)
 
+    # --- Списание с баланса (если есть деньги) ---
+    paid_from_balance = Decimal("0.00")
+    if user.balance > 0 and final_total > 0:
+        paid_from_balance = min(user.balance, final_total)
+        user.balance -= paid_from_balance
+        
+    new_status = OrderStatus.PAID if (final_total - paid_from_balance) <= 0 else OrderStatus.PENDING
+
     new_order = Order(
         user_id=user.telegram_id,
-        status=OrderStatus.PENDING,
+        status=new_status,
         total_price=final_total,
         promo_code_used=request.promo_code if promo else None,
         address=request.address
@@ -102,7 +110,8 @@ async def create_order(
                 user_id=user.telegram_id, 
                 items_text=items_text, 
                 address=request.address, 
-                total_price=float(final_total)
+                total_price=float(final_total),
+                paid_from_balance=float(paid_from_balance)
             )
         except Exception:
             pass # Не сбрасываем заказ, если бот заблокирован

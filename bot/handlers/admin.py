@@ -23,15 +23,18 @@ async def cmd_admin(message: Message):
     await message.answer("Панель администратора. Здесь будут доступны отчеты и настройки.")
 
 # Утилита для вызова из FastAPI эндпоинта (api/routes/orders.py)
-async def notify_new_order(bot: Bot, admin_chat_id: int, order_id: int, username: str, user_id: int, items_text: str, address: str, total_price: float):
+async def notify_new_order(bot: Bot, admin_chat_id: int, order_id: int, username: str, user_id: int, items_text: str, address: str, total_price: float, paid_from_balance: float = 0.0):
     """Отправляет уведомление о новом заказе в рабочий чат."""
+    status_text = "✅ Оплачен (с баланса)" if total_price - paid_from_balance <= 0 else "⏳ Ожидает оплаты"
     text = (
-        f"🚨 <b>Новый заказ №{order_id}!</b>\n"
+        f"🚨 <b>Новый заказ №{order_id}!</b> [{status_text}]\n"
         f"👤 Клиент: {username} (ID: {user_id})\n"
         f"📦 Товар(ы):\n{items_text}\n"
         f"📍 Адрес: {address}\n"
-        f"💰 Итого: {total_price} Br"
+        f"💰 Итого к оплате: {total_price - paid_from_balance:.2f} Br"
     )
+    if paid_from_balance > 0:
+        text += f"\n💳 Списано с баланса: {paid_from_balance:.2f} Br"
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Доставлен", callback_data=f"deliver_{order_id}")]
