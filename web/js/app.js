@@ -237,7 +237,7 @@ function renderProducts(productsToRender) {
         <div class="bg-app-card rounded-2xl p-2 flex flex-col relative cursor-pointer active:scale-95 transition-transform border border-white/5" onclick="showProductDetails(${p.id})">
             <div class="h-36 bg-white rounded-xl mb-3 flex items-center justify-center overflow-hidden relative">
                 <img src="${p.image_url || ''}" class="object-contain h-full w-full p-2" alt="Фото" loading="lazy">
-                <button onclick="event.stopPropagation(); toggleFavorite(${p.id})" class="absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-${isFav ? 'app-accent' : 'white'} hover:scale-110 transition-transform border border-white/10">
+                <button data-fav-btn="${p.id}" onclick="event.stopPropagation(); toggleFavorite(${p.id})" class="absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-${isFav ? 'app-accent' : 'white'} hover:scale-110 transition-transform border border-white/10">
                     <svg fill="${isFav ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
                 </button>
             </div>
@@ -462,6 +462,20 @@ function removeFromCart(cartItemId) {
     renderCart();
 }
 
+function updateCartTotalsDOM() {
+    let localSubtotal = 0;
+    Object.keys(appState.cart).forEach(key => {
+        const item = appState.cart[key];
+        const product = appState.products.find(p => p.id == item.product_id);
+        if (product) localSubtotal += product.price * item.quantity;
+    });
+    const subEl = document.getElementById('cart-subtotal');
+    const totEl = document.getElementById('cart-total');
+    if (subEl) subEl.textContent = `${formatPrice(localSubtotal)} Br`;
+    // Итого временно равно сабтоталу, пока сервер не ответит про промокоды
+    if (totEl && !appState.promoCode) totEl.textContent = `${formatPrice(localSubtotal)} Br`; 
+}
+
 async function renderCart() {
     const itemsContainer = document.getElementById('cart-items');
     const emptyState = document.getElementById('cart-empty');
@@ -489,6 +503,7 @@ async function renderCart() {
         localSubtotal += product.price * item.quantity;
         
         const variantHtml = item.variant ? `<div class="text-[11px] text-app-accent mb-1 font-medium">${item.variant}</div>` : '';
+        const safeKey = key.replace(/"/g, '&quot;');
 
         html += `
             <div class="bg-app-card rounded-2xl p-3 flex gap-3 border border-white/5 items-center">
@@ -502,10 +517,10 @@ async function renderCart() {
                 <div class="flex justify-between items-center">
                     <div class="flex items-center gap-3 bg-app-bg px-2 py-1 rounded-lg border border-white/5">
                         <button onclick='updateCartQuantity("${key}", -1)' class="text-app-muted hover:text-white px-1 font-bold">-</button>
-                        <span class="text-xs font-semibold w-5 text-center">${item.quantity}</span>
+                        <span data-qty="${safeKey}" class="text-xs font-semibold w-5 text-center">${item.quantity}</span>
                         <button onclick='updateCartQuantity("${key}", 1)' class="text-app-muted hover:text-white px-1 font-bold">+</button>
                     </div>
-                        <div class="text-sm font-bold text-app-accent">${formatPrice(product.price * item.quantity)} Br</div>
+                        <div data-price="${safeKey}" class="text-sm font-bold text-app-accent">${formatPrice(product.price * item.quantity)} Br</div>
                 </div>
             </div>
             <button onclick='removeFromCart("${key}")' class="shrink-0 w-10 h-10 bg-red-500/10 text-red-400 rounded-xl flex items-center justify-center hover:bg-red-500/20 transition-colors">
@@ -516,11 +531,19 @@ async function renderCart() {
     
     itemsContainer.innerHTML = html;
 
-    document.getElementById('cart-subtotal').textContent = `${formatPrice(localSubtotal)} Br`;
-    document.getElementById('cart-total').textContent = `${formatPrice(localSubtotal)} Br`;
+    updateCartTotalsDOM();
     
-    // Запрашиваем валидацию с сервера асинхронно
-    validateCartOnBackend();
+    debouncedValidateCart();
+}
+
+let cartValidationTimeout;
+async function debouncedValidateCart() {
+    // Защита от спама на сервер (Дебаунс):
+    // Сервер проверит скидку только когда мы перестанем бешено кликать "Плюс"
+    clearTimeout(cartValidationTimeout);
+    cartValidationTimeout = setTimeout(() => {
+        validateCartOnBackend();
+    }, 400); 
 }
 
 async function validateCartOnBackend() {
@@ -681,7 +704,13 @@ function toggleFavorite(productId) {
     localStorage.setItem('vape_favorites', JSON.stringify([...appState.favorites]));
     
     tg.HapticFeedback.impactOccurred('light');
-    renderProducts(appState.products); // Перерисовываем карточки для обновления заливки сердечка
+    
+    // Точечное обновление DOM без полного перерендера (моментальная плавность)
+    const isFav = appState.favorites.has(productId);
+    document.querySelectorAll(`[data-fav-btn="${productId}"]`).forEach(btn => {
+        btn.className = `absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-${isFav ? 'app-accent' : 'white'} hover:scale-110 transition-transform border border-white/10`;
+        btn.innerHTML = `<svg fill="${isFav ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>`;
+    });
 }
 
 // Запуск
