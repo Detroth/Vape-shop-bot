@@ -16,8 +16,8 @@ const appState = {
     promoCode: null
 };
 
-// Динамическое получение данных (на случай если Telegram загрузится с задержкой)
-const getInitData = () => window.Telegram.WebApp.initData || "test";
+// Строгое получение реальных данных авторизации от Telegram (никаких заглушек)
+const getInitData = () => window.Telegram.WebApp.initData;
 
 // --- ГЛОБАЛЬНАЯ ОБЕРТКА ДЛЯ API ЗАПРОСОВ ---
 async function apiFetch(url, options = {}) {
@@ -34,7 +34,9 @@ async function initializeApp() {
     const initDataStr = window.Telegram.WebApp.initData;
     
     if (!initDataStr) {
-        console.warn("⚠️ Приложение запущено вне Telegram! Используется тестовая моковая строка initData.");
+        console.error("⚠️ Приложение запущено вне Telegram или произошла ошибка получения данных.");
+        tg.showAlert("Пожалуйста, откройте магазин через бота в Telegram.");
+        return; // Останавливаем инициализацию без валидных данных
     }
 
     try {
@@ -71,8 +73,8 @@ function renderProfileHeader(dbUser = null) {
     
     if (tgUser) {
         if (nameEl) nameEl.textContent = tgUser.first_name || tgUser.username || "Пользователь";
-    } else {
-        if (nameEl) nameEl.textContent = "Гость";
+    } else if (dbUser) {
+        if (nameEl) nameEl.textContent = dbUser.username || "Пользователь";
     }
     
     if (dbUser && dbUser.username && usernameEl) {

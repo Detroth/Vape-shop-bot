@@ -20,9 +20,8 @@ def verify_telegram_webapp_data(request: Request, x_telegram_init_data: str = He
     if not init_data and auth_header and auth_header.startswith("Bearer "):
         init_data = auth_header.split(" ", 1)[1]
 
-    # Fallback для тестирования в обычном браузере (вне Telegram)
-    if not init_data or init_data == "test":
-        return {"id": 111111111, "first_name": "Test User", "username": "test_user"}
+    if not init_data:
+        raise HTTPException(status_code=401, detail="Missing Telegram initData")
         
     try:
         parsed_data = dict(parse_qsl(init_data))
