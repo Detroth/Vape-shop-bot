@@ -43,7 +43,7 @@ async def validate_cart(
         if not product:
             raise HTTPException(status_code=404, detail=f"Product ID {item.product_id} not found")
         if product.stock < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Not enough stock for '{product.name}'")
+            raise HTTPException(status_code=400, detail=f"Товара '{product.name}' осталось всего {product.stock} шт.")
             
         initial_base_total += product.price * item.quantity
 

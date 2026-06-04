@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     admin_password: str = Field("admin", description="Пароль админ-панели")
     admin_secret_key: str = Field("secret", description="Секретный ключ для куки сессий")
     
+    # YooKassa
+    yookassa_shop_id: Optional[str] = Field(default=None, description="Shop ID в ЮKassa")
+    yookassa_secret_key: Optional[str] = Field(default=None, description="Секретный ключ (Secret Key) ЮKassa")
+
     @field_validator("database_url", mode="before")
     @classmethod
     def fix_postgres_url(cls, v: str) -> str:

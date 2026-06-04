@@ -43,14 +43,14 @@ async def notify_new_order(bot: Bot, admin_chat_id: int, order_id: int, username
     await bot.send_message(chat_id=admin_chat_id, text=text, reply_markup=keyboard, parse_mode="HTML")
 
 @admin_router.callback_query(F.data.startswith("deliver_"))
-async def process_deliver_order(callback: CallbackQuery):
+async def process_deliver_order(callback: CallbackQuery, bot: Bot):
     order_id = int(callback.data.split("_")[1])
     
     try:
         async with async_session_maker() as session:
             async with session.begin():
                 result = await session.execute(
-                    select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
+                    select(Order).options(selectinload(Order.items)).where(Order.id == order_id).with_for_update()
                 )
                 order = result.scalar_one_or_none()
                 
@@ -58,28 +58,43 @@ async def process_deliver_order(callback: CallbackQuery):
                     await callback.answer("Заказ не найден!", show_alert=True)
                     return
                     
-                if order.status == OrderStatus.DELIVERED:
-                    await callback.answer("Заказ уже доставлен!", show_alert=True)
+                if order.status in (OrderStatus.DELIVERED, OrderStatus.CANCELED):
+                    await callback.answer("Этот заказ уже обработан!", show_alert=True)
+                    await callback.message.edit_reply_markup(reply_markup=None)
                     return
                     
                 if order.status in (OrderStatus.PENDING, OrderStatus.PAID):
                     for item in order.items:
                         if item.product_id:
-                            prod_res = await session.execute(select(Product).where(Product.id == item.product_id))
+                            prod_res = await session.execute(
+                                select(Product).where(Product.id == item.product_id).with_for_update()
+                            )
                             product = prod_res.scalar_one()
                             
                             if product.stock < item.quantity:
-                                await callback.message.answer(f"❌ Ошибка! Недостаточно товара {product.name} на складе!")
+                                await callback.message.answer(f"❌ Ошибка! Невозможно доставить заказ №{order_id}, так как товара {product.name} нет в наличии в нужном количестве!")
                                 await callback.answer()
                                 raise ValueError("Insufficient stock")  # Вызовет автоматический rollback транзакции
                                 
                             product.stock -= item.quantity
                             
                     order.status = OrderStatus.DELIVERED
+                
+                user_id = order.user_id
                     
         # Выполнится только если транзакция завершена успешно и зафиксирована
-        await callback.message.edit_text(f"Заказ №{order_id} успешно доставлен. Остатки списаны. ✅")
+        original_text = callback.message.html_text or f"Заказ №{order_id}"
+        await callback.message.edit_text(f"{original_text}\n\n✅ <b>Заказ №{order_id} успешно выполнен, остатки списаны.</b>", reply_markup=None)
         await callback.answer()
+        
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=f"🎉 Ваш заказ №{order_id} успешно доставлен! Приятного использования!"
+            )
+        except Exception:
+            pass # Игнорируем, если клиент заблокировал бота
+            
     except ValueError:
         pass # Транзакция прервана из-за нехватки товара
 

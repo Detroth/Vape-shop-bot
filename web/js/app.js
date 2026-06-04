@@ -436,6 +436,14 @@ function addToCart(productId, variant = null) {
     // Уникальный ключ для корзины, чтобы разные цвета лежали отдельно
     const cartItemId = variant ? `${productId}_${variant}` : `${productId}`;
     
+    // Проверка остатков (Stock) при добавлении
+    const product = appState.products.find(p => p.id === productId);
+    const currentQty = appState.cart[cartItemId] ? appState.cart[cartItemId].quantity : 0;
+    if (product && currentQty + 1 > product.stock) {
+        tg.showAlert(`Извините, товара в наличии всего ${product.stock} шт.`);
+        return;
+    }
+    
     if (appState.cart[cartItemId]) {
         appState.cart[cartItemId].quantity += 1;
     } else {
@@ -641,22 +649,30 @@ async function submitDeposit() {
         return;
     }
     
+    const btn = document.querySelector('#deposit-modal-content button.bg-app-accent');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
+    
     try {
-        const res = await apiFetch('/api/user/deposit-mock', {
+        const res = await apiFetch('/api/payments/create-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ amount })
         });
         
         if (res.ok) {
-            tg.showPopup({ title: "Успех!", message: `Счет успешно пополнен на ${amount} Br`, buttons: [{text: "OK"}]});
+            const data = await res.json();
             closeDepositModal();
-            loadUserProfile(); // Легкое обновление профиля без моргания экрана!
+            if (data.confirmation_url) tg.openLink(data.confirmation_url);
         } else {
-            tg.showAlert("Ошибка при попытке пополнения");
+            tg.showAlert("Ошибка при создании платежа. Проверьте настройки ЮKassa.");
         }
     } catch (e) {
         tg.showAlert("Сетевая ошибка");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
 }
 
@@ -688,7 +704,10 @@ async function checkout() {
             // Перекидываем пользователя на экран Профиля и сразу открываем Историю заказов
             switchTab('profile');
             fetchOrders();
-        } else { tg.showAlert("Ошибка при оформлении заказа"); }
+        } else { 
+            const errData = await res.json().catch(() => ({}));
+            tg.showAlert(errData.detail || "Ошибка при оформлении заказа. Проверьте остатки товаров."); 
+        }
     } catch (e) { tg.showAlert("Ошибка сети"); }
     finally { btn.disabled = false; btn.textContent = "Оформить заказ"; }
 }
