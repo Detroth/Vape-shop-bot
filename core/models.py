@@ -91,6 +91,7 @@ class OrderItem(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"))
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True, default=None)
     quantity: Mapped[int] = mapped_column(Integer, default=1)
+    variant: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default=None)
     
     # Важное поле: сохраняем цену на момент покупки на случай, если цена товара изменится в будущем
     price_at_purchase: Mapped[Decimal] = mapped_column(Numeric(10, 2))

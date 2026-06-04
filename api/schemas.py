@@ -30,6 +30,7 @@ class ProductResponse(BaseModel):
 class CartItemSchema(BaseModel):
     product_id: int
     quantity: int
+    variant: Optional[str] = None
 
 class CartValidateRequest(BaseModel):
     items: List[CartItemSchema]
@@ -40,11 +41,15 @@ class OrderCreateRequest(BaseModel):
     promo_code: Optional[str] = None
     address: str
 
+class DepositRequest(BaseModel):
+    amount: Decimal
+
 class OrderItemResponse(BaseModel):
     id: int
     product_id: Optional[int]
     quantity: int
     price_at_purchase: Decimal
+    variant: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 class OrderResponse(BaseModel):
