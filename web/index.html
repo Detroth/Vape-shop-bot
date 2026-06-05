@@ -95,8 +95,8 @@
         </div>
 
         <!-- Вкладка: Корзина -->
-        <div id="tab-cart" class="tab-screen hidden p-4 min-h-full flex flex-col">
-            <div class="flex justify-between items-center mb-4 shrink-0">
+        <div id="tab-cart" class="tab-screen hidden p-4 h-full">
+            <div class="flex justify-between items-center mb-4">
                 <h1 class="text-2xl font-bold">Корзина</h1>
                 <button onclick="openPromoModal()" class="bg-app-card px-3 py-1.5 rounded-full text-xs text-app-muted hover:text-white transition-colors border border-white/5">
                     Активировать промокод
@@ -104,18 +104,18 @@
             </div>
             
             <!-- Если пусто -->
-            <div id="cart-empty" class="text-center mt-10 hidden flex-1">
+            <div id="cart-empty" class="text-center mt-10 hidden">
                 <div class="text-app-muted mb-4">Нет товаров</div>
                 <button onclick="switchTab('catalog')" class="bg-app-card border border-app-accent/30 text-app-accent px-6 py-2 rounded-xl font-medium">В каталог</button>
             </div>
 
             <!-- Список товаров -->
-            <div id="cart-items" class="flex-1 overflow-y-auto space-y-3 pb-4">
+            <div id="cart-items" class="space-y-3 pb-48">
                 <!-- Рендерится через JS -->
             </div>
 
             <!-- Чек / Итог -->
-            <div id="cart-receipt" class="shrink-0 bg-app-card p-4 rounded-2xl shadow-lg mt-auto hidden border border-white/5">
+            <div id="cart-receipt" class="fixed bottom-[68px] left-0 w-full bg-app-card p-5 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] z-40 hidden border-t border-white/10">
                 <div class="flex justify-between text-sm text-app-muted mb-1">
                     <span>Товары:</span>
                     <span id="cart-subtotal">0 Br</span>

@@ -247,17 +247,18 @@ function buildProductCardsHTML(productsToRender, context = 'catalog') {
             }
         }
 
+        const safeCartKey = cartKey.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         let cartControls = '';
         if (qty > 0) {
             cartControls = `
                 <div class="flex items-center justify-between gap-2 bg-app-accent/10 border border-app-accent/20 rounded-lg px-2 py-1.5" onclick="event.stopPropagation();">
-                    <button onclick="updateCartQuantity('${cartKey}', -1); refreshActiveTabProducts();" class="text-app-accent hover:text-white px-2 font-bold transition-colors">-</button>
+                    <button onclick="updateCartQuantity('${safeCartKey}', -1)" class="text-app-accent hover:text-white px-2 font-bold transition-colors">-</button>
                     <span class="text-xs font-bold text-white w-4 text-center">${qty}</span>
-                    <button onclick="updateCartQuantity('${cartKey}', 1); refreshActiveTabProducts();" class="text-app-accent hover:text-white px-2 font-bold transition-colors">+</button>
+                    <button onclick="updateCartQuantity('${safeCartKey}', 1)" class="text-app-accent hover:text-white px-2 font-bold transition-colors">+</button>
                 </div>
             `;
         } else {
-            const addAction = hasVariants ? `showProductDetails(${p.id})` : `addToCart(${p.id}); refreshActiveTabProducts();`;
+            const addAction = hasVariants ? `showProductDetails(${p.id})` : `addToCart(${p.id})`;
             cartControls = `
                 <button onclick="event.stopPropagation(); ${addAction}" class="bg-app-bg w-8 h-8 rounded-lg flex items-center justify-center text-app-muted hover:text-app-accent border border-white/5 transition-colors">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
@@ -459,13 +460,14 @@ function renderProductDetailsButton() {
     
     const cartKey = variant ? `${product.id}_${variant}` : `${product.id}`;
     const qty = appState.cart[cartKey] ? appState.cart[cartKey].quantity : 0;
+    const safeCartKey = cartKey.replace(/'/g, "\\'").replace(/"/g, "&quot;");
     
     if (qty > 0) {
         container.innerHTML = `
             <div class="w-full h-[50px] bg-app-accent/10 border border-app-accent/20 rounded-2xl flex justify-between items-center px-4">
-                <button onclick="updateCartQuantity('${cartKey}', -1)" class="text-app-accent hover:text-white px-4 py-2 font-bold text-xl transition-colors">-</button>
+                <button onclick="updateCartQuantity('${safeCartKey}', -1)" class="text-app-accent hover:text-white px-4 py-2 font-bold text-xl transition-colors">-</button>
                 <span class="text-base font-bold text-white">${qty} шт / ${formatPrice(product.price * qty)} Br</span>
-                <button onclick="updateCartQuantity('${cartKey}', 1)" class="text-app-accent hover:text-white px-4 py-2 font-bold text-xl transition-colors">+</button>
+                <button onclick="updateCartQuantity('${safeCartKey}', 1)" class="text-app-accent hover:text-white px-4 py-2 font-bold text-xl transition-colors">+</button>
             </div>
         `;
     } else {
@@ -677,7 +679,8 @@ async function renderCart() {
         localSubtotal += product.price * item.quantity;
         
         const variantHtml = item.variant ? `<div class="text-[11px] text-app-accent mb-1 font-medium">${item.variant}</div>` : '';
-        const safeKey = key.replace(/"/g, '&quot;');
+        const safeKey = key.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const safeKeyForData = key.replace(/"/g, '&quot;'); // для data-атрибутов
 
         html += `
             <div class="bg-app-card rounded-2xl p-3 flex gap-3 border border-white/5 items-center">
@@ -690,14 +693,14 @@ async function renderCart() {
                     <div class="text-xs text-app-muted mb-2">Цена/шт ${formatPrice(product.price)} Br</div>
                 <div class="flex justify-between items-center">
                     <div class="flex items-center gap-3 bg-app-bg px-2 py-1 rounded-lg border border-white/5">
-                        <button onclick='updateCartQuantity("${key}", -1)' class="text-app-muted hover:text-white px-1 font-bold">-</button>
-                        <span data-qty="${safeKey}" class="text-xs font-semibold w-5 text-center">${item.quantity}</span>
-                        <button onclick='updateCartQuantity("${key}", 1)' class="text-app-muted hover:text-white px-1 font-bold">+</button>
+                        <button onclick="updateCartQuantity('${safeKey}', -1)" class="text-app-muted hover:text-white px-1 font-bold">-</button>
+                        <span data-qty="${safeKeyForData}" class="text-xs font-semibold w-5 text-center">${item.quantity}</span>
+                        <button onclick="updateCartQuantity('${safeKey}', 1)" class="text-app-muted hover:text-white px-1 font-bold">+</button>
                     </div>
-                        <div data-price="${safeKey}" class="text-sm font-bold text-app-accent">${formatPrice(product.price * item.quantity)} Br</div>
+                        <div data-price="${safeKeyForData}" class="text-sm font-bold text-app-accent">${formatPrice(product.price * item.quantity)} Br</div>
                 </div>
             </div>
-            <button onclick='removeFromCart("${key}")' class="shrink-0 w-10 h-10 bg-red-500/10 text-red-400 rounded-xl flex items-center justify-center hover:bg-red-500/20 transition-colors">
+            <button onclick="removeFromCart('${safeKey}')" class="shrink-0 w-10 h-10 bg-red-500/10 text-red-400 rounded-xl flex items-center justify-center hover:bg-red-500/20 transition-colors">
                 <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
             </button>
             </div>`;
@@ -717,7 +720,7 @@ async function debouncedValidateCart() {
     clearTimeout(cartValidationTimeout);
     cartValidationTimeout = setTimeout(() => {
         validateCartOnBackend();
-    }, 150); 
+    }, 50); 
 }
 
 async function validateCartOnBackend() {
