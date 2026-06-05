@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramForbiddenError, TelegramAPIError
+from decimal import Decimal
 
 from core.database import async_session_maker
 from core.models import Order, OrderStatus, Product, User
@@ -23,18 +24,32 @@ async def cmd_admin(message: Message):
     await message.answer("Панель администратора. Здесь будут доступны отчеты и настройки.")
 
 # Утилита для вызова из FastAPI эндпоинта (api/routes/orders.py)
-async def notify_new_order(bot: Bot, admin_chat_id: int, order_id: int, username: str, user_id: int, items_text: str, address: str, total_price: float, paid_from_balance: float = 0.0):
+async def notify_new_order(
+    bot: Bot, admin_chat_id: int, order_id: int, client_name: str, client_phone: str, 
+    tg_username: str, delivery_type: str, address: str, comment: str, items_text: str, 
+    total_price: float, promo_code_used: str = None
+):
     """Отправляет уведомление о новом заказе в рабочий чат."""
-    status_text = "✅ Оплачен (с баланса)" if total_price - paid_from_balance <= 0 else "⏳ Ожидает оплаты"
+    delivery_str = "Доставка" if delivery_type == "delivery" else "Самовывоз"
+    addr_str = address if address else "Самовывоз"
+    comment_str = comment if comment else "Нет"
+    promo_str = f" (Применен код: {promo_code_used})" if promo_code_used else ""
+    tg_username_str = tg_username if tg_username else "скрыт"
+
     text = (
-        f"🚨 <b>Новый заказ №{order_id}!</b> [{status_text}]\n"
-        f"👤 Клиент: {username} (ID: {user_id})\n"
-        f"📦 Товар(ы):\n{items_text}\n"
-        f"📍 Адрес: {address}\n"
-        f"💰 Итого к оплате: {total_price - paid_from_balance:.2f} Br"
+        f"📦 <b>ПОСТУПИЛ НОВЫЙ ЗАКАЗ №{order_id}</b> 📦\n"
+        f"---------------------------------\n"
+        f"👤 <b>Клиент:</b> {client_name}\n"
+        f"📞 <b>Телефон:</b> {client_phone}\n"
+        f"✈️ <b>Telegram:</b> @{tg_username_str}\n\n"
+        f"⚙️ <b>Тип:</b> {delivery_str}\n"
+        f"📍 <b>Адрес:</b> {addr_str}\n"
+        f"💬 <b>Комментарий:</b> {comment_str}\n"
+        f"---------------------------------\n"
+        f"🛒 <b>Товары:</b>\n"
+        f"{items_text}\n\n"
+        f"💵 <b>Итого к оплате:</b> {total_price:.2f} Br{promo_str}"
     )
-    if paid_from_balance > 0:
-        text += f"\n💳 Списано с баланса: {paid_from_balance:.2f} Br"
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Доставлен", callback_data=f"deliver_{order_id}")]
@@ -97,6 +112,45 @@ async def process_deliver_order(callback: CallbackQuery, bot: Bot):
             
     except ValueError:
         pass # Транзакция прервана из-за нехватки товара
+
+@admin_router.callback_query(F.data.startswith("deposit_confirm_"))
+async def process_deposit_confirm(callback: CallbackQuery, bot: Bot):
+    parts = callback.data.split("_")
+    user_id = int(parts[2])
+    amount = Decimal(parts[3])
+    
+    try:
+        async with async_session_maker() as session:
+            async with session.begin():
+                result = await session.execute(
+                    select(User).where(User.telegram_id == user_id).with_for_update()
+                )
+                user = result.scalar_one_or_none()
+                
+                if not user:
+                    await callback.answer("Пользователь не найден!", show_alert=True)
+                    return
+                    
+                user.balance += amount
+                username = user.username or str(user_id)
+        
+        await callback.message.edit_text(f"✅ Пополнение на {amount:.2f} Br для @{username} одобрено.", reply_markup=None)
+        await callback.answer()
+        
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=f"💳 Ваш баланс успешно пополнен на {amount:.2f} Br!"
+            )
+        except Exception:
+            pass
+    except Exception:
+        await callback.answer("Ошибка при пополнении!", show_alert=True)
+
+@admin_router.callback_query(F.data.startswith("deposit_reject_"))
+async def process_deposit_reject(callback: CallbackQuery):
+    await callback.message.edit_text("❌ Заявка на пополнение отклонена.", reply_markup=None)
+    await callback.answer()
 
 @admin_router.message(Command("broadcast"))
 async def cmd_broadcast(message: Message, state: FSMContext):

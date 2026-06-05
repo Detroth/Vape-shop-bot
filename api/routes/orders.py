@@ -79,7 +79,12 @@ async def create_order(
         status=new_status,
         total_price=final_total,
         promo_code_used=request.promo_code if promo else None,
-        address=request.address
+        address=request.address,
+        delivery_type=request.delivery_type,
+        customer_name=request.client_name,
+        customer_phone=request.client_phone,
+        customer_tg_username=request.tg_username,
+        comment=request.comment
     )
     db.add(new_order)
     await db.flush() 
@@ -92,26 +97,30 @@ async def create_order(
             order_id=new_order.id,
             product_id=item.product_id,
             quantity=item.quantity,
-            price_at_purchase=product_obj.price
+            price_at_purchase=product_obj.price,
+            variant=item.variant
         ))
-        items_text_lines.append(f"- {product_obj.name} ({item.quantity} шт.)")
+        variant_text = f" [{item.variant}]" if item.variant else ""
+        items_text_lines.append(f"- {product_obj.name}{variant_text} ({item.quantity} шт.)")
         
     await db.commit()
     
     if settings.admin_chat_id:
         try:
             items_text = "\n".join(items_text_lines)
-            username = f"@{user.username}" if user.username else "Без имени"
             await notify_new_order(
                 bot=bot, 
                 admin_chat_id=settings.admin_chat_id, 
                 order_id=new_order.id, 
-                username=username, 
-                user_id=user.telegram_id, 
+                client_name=request.client_name,
+                client_phone=request.client_phone,
+                tg_username=request.tg_username or user.username or str(user.telegram_id),
+                delivery_type=request.delivery_type,
+                address=request.address,
+                comment=request.comment,
                 items_text=items_text, 
-                address=request.address, 
-                total_price=float(final_total),
-                paid_from_balance=float(paid_from_balance)
+                total_price=float(final_total - paid_from_balance),
+                promo_code_used=request.promo_code if promo else None
             )
         except Exception:
             pass # Не сбрасываем заказ, если бот заблокирован

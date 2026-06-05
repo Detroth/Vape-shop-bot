@@ -119,7 +119,7 @@
                     <span>Итог:</span>
                     <span id="cart-total" class="text-app-accent">0 Br</span>
                 </div>
-                <button onclick="checkout()" id="checkout-btn" class="w-full bg-app-accent hover:bg-blue-500 active:scale-[0.98] transition-all text-white py-3.5 rounded-xl font-bold shadow-[0_4px_15px_rgba(59,153,252,0.4)]">
+                <button onclick="openCheckoutScreen()" id="checkout-btn" class="w-full bg-app-accent hover:bg-blue-500 active:scale-[0.98] transition-all text-white py-3.5 rounded-xl font-bold shadow-[0_4px_15px_rgba(59,153,252,0.4)]">
                     Оформить заказ
                 </button>
             </div>
@@ -272,6 +272,47 @@
                 <button onclick="closeDepositModal()" class="flex-1 bg-white/5 hover:bg-white/10 py-3 rounded-xl font-medium transition-colors">Отмена</button>
                 <button onclick="submitDeposit()" class="flex-1 bg-app-accent hover:bg-blue-500 py-3 rounded-xl font-medium transition-colors shadow-lg">Пополнить</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Экран: Оформление заказа (Checkout) -->
+    <div id="checkout-screen" class="fixed inset-0 bg-app-bg z-[60] flex flex-col hidden transition-opacity">
+        <div class="flex-1 overflow-y-auto pb-[90px] p-4">
+            <div class="flex items-center mb-6 mt-2 relative">
+                <button onclick="closeCheckoutScreen()" class="absolute left-0 bg-app-card p-2 rounded-xl text-white border border-white/5 hover:bg-white/5 transition-colors">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                </button>
+                <h2 class="text-xl font-bold w-full text-center">Оформление заказа</h2>
+            </div>
+            
+            <!-- Выбор способа получения -->
+            <div class="flex bg-app-card rounded-xl p-1 mb-5 border border-white/5">
+                <button id="btn-type-delivery" onclick="setCheckoutDeliveryType('delivery')" class="flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md">🚚 Доставка</button>
+                <button id="btn-type-pickup" onclick="setCheckoutDeliveryType('pickup')" class="flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white">🏪 Самовывоз</button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-app-muted uppercase mb-1">Имя получателя *</label>
+                    <input type="text" id="checkout-name" oninput="validateCheckoutForm()" placeholder="Ваше имя" class="w-full bg-app-card text-white px-4 py-3.5 rounded-xl outline-none border border-white/5 focus:border-app-accent transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-app-muted uppercase mb-1">Номер телефона *</label>
+                    <input type="tel" id="checkout-phone" oninput="validateCheckoutForm()" placeholder="+375 (XX) XXX-XX-XX" class="w-full bg-app-card text-white px-4 py-3.5 rounded-xl outline-none border border-white/5 focus:border-app-accent transition-colors">
+                </div>
+                <div id="wrapper-checkout-address">
+                    <label class="block text-xs font-semibold text-app-muted uppercase mb-1">Адрес доставки *</label>
+                    <input type="text" id="checkout-address" oninput="validateCheckoutForm()" placeholder="Город, Улица, Дом, Кв." class="w-full bg-app-card text-white px-4 py-3.5 rounded-xl outline-none border border-white/5 focus:border-app-accent transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-app-muted uppercase mb-1">Комментарий (Необязательно)</label>
+                    <textarea id="checkout-comment" rows="2" placeholder="Дополнительная информация" class="w-full bg-app-card text-white px-4 py-3.5 rounded-xl outline-none border border-white/5 focus:border-app-accent transition-colors resize-none"></textarea>
+                </div>
+                <input type="hidden" id="checkout-tg" value="">
+            </div>
+        </div>
+        <div class="p-4 bg-app-bg border-t border-white/5">
+            <button id="submit-checkout-btn" onclick="submitCheckoutForm()" disabled class="w-full bg-app-accent hover:bg-blue-500 text-white py-4 rounded-xl font-bold shadow-lg opacity-50 cursor-not-allowed transition-all">Продолжить оформление</button>
         </div>
     </div>
 

@@ -655,18 +655,17 @@ async function submitDeposit() {
     btn.innerHTML = '<svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
     
     try {
-        const res = await apiFetch('/api/payments/create-invoice', {
+        const res = await apiFetch('/api/payments/request-deposit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ amount })
         });
         
         if (res.ok) {
-            const data = await res.json();
             closeDepositModal();
-            if (data.confirmation_url) tg.openLink(data.confirmation_url);
+            tg.showPopup({ title: "Успешно!", message: "Заявка отправлена администратору. Ожидайте подтверждения.", buttons: [{text: "OK"}]});
         } else {
-            tg.showAlert("Ошибка при создании платежа. Проверьте настройки ЮKassa.");
+            tg.showAlert("Ошибка при отправке заявки.");
         }
     } catch (e) {
         tg.showAlert("Сетевая ошибка");
@@ -676,22 +675,86 @@ async function submitDeposit() {
     }
 }
 
-// --- ОФОРМЛЕНИЕ ЗАКАЗА ---
-async function checkout() {
-    // Запрашиваем у пользователя адрес доставки
-    const address = prompt("📍 Введите адрес доставки (или оставьте 'Самовывоз'):", "Самовывоз");
-    if (address === null) return; // Пользователь нажал "Отмена"
+// --- ЛОГИКА ФОРМЫ ОФОРМЛЕНИЯ ЗАКАЗА ---
+let checkoutDeliveryType = 'delivery';
 
-    const btn = document.getElementById('checkout-btn');
+function openCheckoutScreen() {
+    // Заполняем скрытый инпут ником
+    const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+    if (tgUser && tgUser.username) {
+        document.getElementById('checkout-tg').value = tgUser.username;
+    }
+    
+    setCheckoutDeliveryType('delivery'); // По умолчанию доставка
+    document.getElementById('checkout-screen').classList.remove('hidden');
+    tg.BackButton.show();
+    tg.BackButton.onClick(closeCheckoutScreen);
+}
+
+function closeCheckoutScreen() {
+    document.getElementById('checkout-screen').classList.add('hidden');
+    tg.BackButton.hide();
+}
+
+function setCheckoutDeliveryType(type) {
+    checkoutDeliveryType = type;
+    const delBtn = document.getElementById('btn-type-delivery');
+    const pickBtn = document.getElementById('btn-type-pickup');
+    const addrWrap = document.getElementById('wrapper-checkout-address');
+
+    if(type === 'delivery') {
+        delBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent';
+        pickBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
+        addrWrap.classList.remove('hidden');
+    } else {
+        pickBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent';
+        delBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
+        addrWrap.classList.add('hidden');
+    }
+    validateCheckoutForm();
+}
+
+function validateCheckoutForm() {
+    const name = document.getElementById('checkout-name').value.trim();
+    const phone = document.getElementById('checkout-phone').value.trim();
+    const address = document.getElementById('checkout-address').value.trim();
+    const btn = document.getElementById('submit-checkout-btn');
+
+    let isValid = name.length >= 2 && phone.length >= 5;
+    if (checkoutDeliveryType === 'delivery' && address.length < 5) isValid = false;
+
+    if (isValid) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+async function submitCheckoutForm() {
+    const btn = document.getElementById('submit-checkout-btn');
+    const originalText = btn.textContent;
     btn.disabled = true;
     btn.innerHTML = '<svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
     
     const items = Object.values(appState.cart).map(i => ({ product_id: i.product_id, quantity: i.quantity, variant: i.variant }));
+    const payload = {
+        items: items,
+        promo_code: appState.promoCode,
+        delivery_type: checkoutDeliveryType,
+        client_name: document.getElementById('checkout-name').value.trim(),
+        client_phone: document.getElementById('checkout-phone').value.trim(),
+        address: checkoutDeliveryType === 'delivery' ? document.getElementById('checkout-address').value.trim() : null,
+        comment: document.getElementById('checkout-comment').value.trim(),
+        tg_username: document.getElementById('checkout-tg').value.trim()
+    };
+
     try {
         const res = await apiFetch('/api/orders/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items, promo_code: appState.promoCode, address: address.trim() || "Самовывоз" })
+            body: JSON.stringify(payload)
         });
         if (res.ok) {
             tg.showPopup({ title: "Успешно!", message: "Ваш заказ оформлен. Менеджер свяжется с вами.", buttons: [{text: "OK"}]});
@@ -702,6 +765,7 @@ async function checkout() {
             await loadUserProfile(); // Легкое обновление профиля, чтобы подтянуть списанный баланс
             
             // Перекидываем пользователя на экран Профиля и сразу открываем Историю заказов
+            closeCheckoutScreen();
             switchTab('profile');
             fetchOrders();
         } else { 
@@ -709,7 +773,10 @@ async function checkout() {
             tg.showAlert(errData.detail || "Ошибка при оформлении заказа. Проверьте остатки товаров."); 
         }
     } catch (e) { tg.showAlert("Ошибка сети"); }
-    finally { btn.disabled = false; btn.textContent = "Оформить заказ"; }
+    finally { 
+        btn.disabled = false; 
+        btn.textContent = originalText; 
+    }
 }
 
 function toggleFavorite(productId) {

@@ -77,6 +77,12 @@ class Order(Base):
     promo_code_used: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     
+    delivery_type: Mapped[str] = mapped_column(String(20), default="delivery")
+    customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    customer_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    customer_tg_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
     # Автоматическое проставление времени при создании записи
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

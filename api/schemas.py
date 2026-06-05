@@ -39,7 +39,12 @@ class CartValidateRequest(BaseModel):
 class OrderCreateRequest(BaseModel):
     items: List[CartItemSchema]
     promo_code: Optional[str] = None
-    address: str
+    delivery_type: str = "delivery"
+    client_name: str
+    client_phone: str
+    address: Optional[str] = None
+    comment: Optional[str] = None
+    tg_username: Optional[str] = None
 
 class DepositRequest(BaseModel):
     amount: Decimal
