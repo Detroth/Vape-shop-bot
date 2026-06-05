@@ -414,17 +414,24 @@ function showProductDetails(productId) {
     const variantsContainer = document.getElementById('detail-variants');
     variantsContainer.innerHTML = '';
     
-    const colors = product.characteristics?.colors || product.characteristics?.variants || ["Стандартный"];
-    appState.selectedVariant = colors[0];
+    const variants = product.characteristics?.variants || product.characteristics?.colors || [];
+    const variantsTitle = document.getElementById('detail-variants-title');
     
-    colors.forEach((color, idx) => {
-        const isSelected = idx === 0; // По умолчанию выбран первый
-        const vBtn = document.createElement('button');
-        vBtn.className = `px-5 py-2.5 rounded-[12px] bg-app-card whitespace-nowrap text-[13px] font-medium transition-colors border ${isSelected ? 'border-app-accent text-white' : 'border-white/5 text-app-muted'} active:scale-95`;
-        vBtn.textContent = color;
-        vBtn.onclick = () => selectVariant(color, colors);
-        variantsContainer.appendChild(vBtn);
-    });
+    if (variants.length > 0) {
+        appState.selectedVariant = variants[0];
+        if (variantsTitle) variantsTitle.classList.remove('hidden');
+        variants.forEach((v) => {
+            const isSelected = v === appState.selectedVariant;
+            const vBtn = document.createElement('button');
+            vBtn.className = `px-5 py-2.5 rounded-[12px] bg-app-card whitespace-nowrap text-[13px] font-medium transition-colors border ${isSelected ? 'border-app-accent text-white' : 'border-white/5 text-app-muted'} active:scale-95`;
+            vBtn.textContent = v;
+            vBtn.onclick = () => selectVariant(v, variants);
+            variantsContainer.appendChild(vBtn);
+        });
+    } else {
+        appState.selectedVariant = null;
+        if (variantsTitle) variantsTitle.classList.add('hidden');
+    }
 
     renderProductDetailsButton();
 
