@@ -41,7 +41,7 @@
 <body class="h-screen overflow-hidden flex flex-col bg-app-bg text-app-text select-none font-sans">
 
     <!-- Глобальный контейнер контента -->
-    <div id="app-content" class="flex-1 overflow-y-auto pb-20">
+    <div id="app-content" class="flex-1 overflow-y-auto pb-32">
         
         <!-- Вкладка: Каталог -->
         <div id="tab-catalog" class="tab-screen p-3 h-full">
@@ -82,7 +82,16 @@
         <!-- Вкладка: Поиск -->
         <div id="tab-search" class="tab-screen hidden p-4 h-full">
             <h1 class="text-2xl font-bold mb-4">Поиск</h1>
-            <input type="text" placeholder="Найти товар..." class="w-full bg-app-card text-app-text placeholder-app-muted rounded-xl px-4 py-3 outline-none border border-transparent focus:border-app-accent transition-colors">
+            <div class="relative">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-app-muted">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                <input type="text" id="dedicated-search-input" oninput="handleDedicatedSearch()" placeholder="Введите название товара..." class="w-full bg-app-card text-app-text placeholder-app-muted rounded-xl pl-10 pr-4 py-3 outline-none border border-white/5 focus:border-app-accent transition-colors">
+            </div>
+            <div id="dedicated-search-empty" class="text-center text-app-muted mt-10 hidden">Товары не найдены</div>
+            <div id="dedicated-search-results" class="grid grid-cols-2 gap-3 pb-6 mt-5">
+                <!-- Результаты поиска вставляются через JS -->
+            </div>
         </div>
 
         <!-- Вкладка: Корзина -->
@@ -128,7 +137,8 @@
         <!-- Вкладка: Избранное -->
         <div id="tab-favorites" class="tab-screen hidden p-4 h-full">
             <h1 class="text-2xl font-bold mb-4">Избранное</h1>
-            <div class="text-center text-app-muted mt-10">Нет избранных товаров</div>
+            <div id="favorites-empty" class="text-center text-app-muted mt-10">Список избранного пуст</div>
+            <div id="favorites-grid" class="grid grid-cols-2 gap-3 pb-6 mt-2"></div>
         </div>
 
         <!-- Вкладка: Профиль -->
@@ -170,8 +180,8 @@
             </button>
             
             <!-- Область фото -->
-            <div class="w-full h-80 bg-[#e6e8eb] flex items-center justify-center p-6 relative">
-                <img id="detail-img" src="" class="max-h-full object-contain mix-blend-multiply drop-shadow-xl" alt="Product Image">
+            <div class="w-full h-80 flex items-center justify-center relative">
+                <img id="detail-img" src="" class="w-full h-full object-cover rounded-t-xl" alt="Product Image">
             </div>
             
             <!-- Информация -->

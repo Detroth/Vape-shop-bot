@@ -28,7 +28,8 @@ const appState = {
     currentTab: 'catalog',
     activeProduct: null,
     selectedVariant: null,
-    promoCode: null
+    promoCode: null,
+    searchResults: null
 };
 
 // Строгое получение реальных данных авторизации от Telegram (никаких заглушек)
@@ -134,6 +135,10 @@ function switchTab(tabName) {
         if (window.currentUser) renderProfile(window.currentUser); // Показываем сразу из кэша
         loadUserProfile(); // Параллельно тянем свежие данные (баланс)
     }
+    
+    if (tabName === 'favorites') {
+        renderFavorites();
+    }
 
     // 3. Обновляем цвета кнопок в навигации
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -221,6 +226,69 @@ function filterAndRenderProducts() {
     renderProducts(filtered);
 }
 
+function buildProductCardsHTML(productsToRender, context = 'catalog') {
+    let html = '';
+    productsToRender.forEach(p => {
+        const isFav = appState.favorites.has(p.id);
+        const hasVariants = p.characteristics?.variants?.length > 0 || p.characteristics?.colors?.length > 0;
+        
+        // Проверяем, есть ли товар в корзине
+        let qty = 0;
+        let cartKey = `${p.id}`;
+        if (hasVariants) {
+            const variantKeys = Object.keys(appState.cart).filter(k => appState.cart[k].product_id === p.id);
+            if (variantKeys.length > 0) {
+                cartKey = variantKeys[0]; // Берем первый вариант для управления из каталога
+                qty = appState.cart[cartKey].quantity;
+            }
+        } else {
+            if (appState.cart[cartKey]) {
+                qty = appState.cart[cartKey].quantity;
+            }
+        }
+
+        let cartControls = '';
+        if (qty > 0) {
+            cartControls = `
+                <div class="flex items-center justify-between gap-2 bg-app-accent/10 border border-app-accent/20 rounded-lg px-2 py-1.5" onclick="event.stopPropagation();">
+                    <button onclick="updateCartQuantity('${cartKey}', -1); refreshActiveTabProducts();" class="text-app-accent hover:text-white px-2 font-bold transition-colors">-</button>
+                    <span class="text-xs font-bold text-white w-4 text-center">${qty}</span>
+                    <button onclick="updateCartQuantity('${cartKey}', 1); refreshActiveTabProducts();" class="text-app-accent hover:text-white px-2 font-bold transition-colors">+</button>
+                </div>
+            `;
+        } else {
+            const addAction = hasVariants ? `showProductDetails(${p.id})` : `addToCart(${p.id}); refreshActiveTabProducts();`;
+            cartControls = `
+                <button onclick="event.stopPropagation(); ${addAction}" class="bg-app-bg w-8 h-8 rounded-lg flex items-center justify-center text-app-muted hover:text-app-accent border border-white/5 transition-colors">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+                </button>
+            `;
+        }
+        
+        const favButtonHTML = context === 'favorites' 
+            ? `<button onclick="event.stopPropagation(); removeFavorite(${p.id})" class="absolute top-2 right-2 bg-black/40 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-red-400 hover:scale-110 transition-transform border border-white/10 shadow-lg">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+               </button>`
+            : `<button data-fav-btn="${p.id}" onclick="event.stopPropagation(); toggleFavorite(${p.id})" class="absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-${isFav ? 'app-accent' : 'white'} hover:scale-110 transition-transform border border-white/10 shadow-md">
+                <svg fill="${isFav ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+            </button>`;
+
+        html += `
+        <div class="bg-app-card rounded-2xl p-2 flex flex-col relative cursor-pointer active:scale-95 transition-transform border border-white/5" onclick="showProductDetails(${p.id})">
+            <div class="h-36 rounded-xl mb-3 flex items-center justify-center overflow-hidden relative">
+                <img src="${p.image_url || ''}" class="w-full h-full object-cover rounded-t-xl" alt="Фото" loading="lazy">
+                ${favButtonHTML}
+            </div>
+            <h2 class="text-[13px] font-medium mb-2 line-clamp-2 leading-snug flex-1">${p.name}</h2>
+            <div class="mt-auto flex justify-between items-center h-8">
+                <span class="font-bold text-[14px] text-app-accent leading-none">${formatPrice(p.price)} Br</span>
+                ${cartControls}
+            </div>
+        </div>`;
+    });
+    return html;
+}
+
 function renderProducts(productsToRender) {
     const grid = document.getElementById('products-grid');
 
@@ -229,25 +297,20 @@ function renderProducts(productsToRender) {
         return;
     }
 
-    let html = '';
-    productsToRender.forEach(p => {
-        const isFav = appState.favorites.has(p.id);
-        
-        html += `
-        <div class="bg-app-card rounded-2xl p-2 flex flex-col relative cursor-pointer active:scale-95 transition-transform border border-white/5" onclick="showProductDetails(${p.id})">
-            <div class="h-36 bg-white rounded-xl mb-3 flex items-center justify-center overflow-hidden relative">
-                <img src="${p.image_url || ''}" class="object-contain h-full w-full p-2" alt="Фото" loading="lazy">
-                <button data-fav-btn="${p.id}" onclick="event.stopPropagation(); toggleFavorite(${p.id})" class="absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-${isFav ? 'app-accent' : 'white'} hover:scale-110 transition-transform border border-white/10">
-                    <svg fill="${isFav ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
-                </button>
-            </div>
-            <h2 class="text-[13px] font-medium mb-2 line-clamp-2 leading-snug flex-1">${p.name}</h2>
-            <div class="mt-auto">
-                <span class="font-bold text-[15px] text-app-accent leading-none">${formatPrice(p.price)} Br</span>
-            </div>
-        </div>`;
-    });
-    grid.innerHTML = html;
+    grid.innerHTML = buildProductCardsHTML(productsToRender, 'catalog');
+}
+
+function refreshActiveTabProducts() {
+    if (appState.currentTab === 'catalog') {
+        renderProducts(appState.products);
+    } else if (appState.currentTab === 'search') {
+        if (appState.searchResults) {
+            const grid = document.getElementById('dedicated-search-results');
+            grid.innerHTML = buildProductCardsHTML(appState.searchResults, 'search');
+        }
+    } else if (appState.currentTab === 'favorites') {
+        renderFavorites();
+    }
 }
 
 let searchTimeout;
@@ -256,6 +319,81 @@ function handleSearch() {
     searchTimeout = setTimeout(() => {
         filterAndRenderProducts();
     }, 150); // Снизили задержку: фильтрация мгновенная
+}
+
+// --- ЛОГИКА ВКЛАДКИ ПОИСКА (ДЕДИКЕЙТЕД) ---
+let dedicatedSearchTimeout;
+function handleDedicatedSearch() {
+    clearTimeout(dedicatedSearchTimeout);
+    dedicatedSearchTimeout = setTimeout(async () => {
+        const query = document.getElementById('dedicated-search-input').value.trim();
+        const grid = document.getElementById('dedicated-search-results');
+        const empty = document.getElementById('dedicated-search-empty');
+
+        if (!query) {
+            grid.innerHTML = '';
+            empty.classList.add('hidden');
+            appState.searchResults = null;
+            return;
+        }
+
+        grid.innerHTML = '<div class="col-span-2 text-center text-app-muted mt-10">Загрузка...</div>';
+        empty.classList.add('hidden');
+
+        try {
+            // Асинхронный запрос к бэкенду
+            const res = await apiFetch(`/api/catalog/products?search=${encodeURIComponent(query)}`);
+            if (res.ok) {
+                const results = await res.json();
+                appState.searchResults = results;
+                
+                if (results.length === 0) {
+                    grid.innerHTML = '';
+                    empty.classList.remove('hidden');
+                } else {
+                    empty.classList.add('hidden');
+                    grid.innerHTML = buildProductCardsHTML(results, 'search');
+                }
+            } else {
+                grid.innerHTML = '';
+                empty.textContent = 'Ошибка при поиске';
+                empty.classList.remove('hidden');
+            }
+        } catch (e) {
+            grid.innerHTML = '';
+            empty.textContent = 'Ошибка сети';
+            empty.classList.remove('hidden');
+        }
+    }, 300);
+}
+
+// --- ЛОГИКА ВКЛАДКИ ИЗБРАННОГО ---
+function updateFavoritesBadge() {
+    const badge = document.getElementById('badge-favorites');
+    if (badge) {
+        if (appState.favorites.size > 0) {
+            badge.textContent = appState.favorites.size;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+}
+
+function renderFavorites() {
+    const grid = document.getElementById('favorites-grid');
+    const empty = document.getElementById('favorites-empty');
+    
+    // Фильтруем закэшированные товары
+    const favProducts = appState.allProducts.filter(p => appState.favorites.has(p.id));
+    
+    if (favProducts.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+    } else {
+        empty.classList.add('hidden');
+        grid.innerHTML = buildProductCardsHTML(favProducts, 'favorites');
+    }
 }
 
 // --- ЛОГИКА ДЕТАЛЬНОГО ЭКРАНА ТОВАРА ---
@@ -790,13 +928,31 @@ function toggleFavorite(productId) {
     localStorage.setItem('vape_favorites', JSON.stringify([...appState.favorites]));
     
     tg.HapticFeedback.impactOccurred('light');
+    updateFavoritesBadge();
     
     // Точечное обновление DOM без полного перерендера (моментальная плавность)
     const isFav = appState.favorites.has(productId);
     document.querySelectorAll(`[data-fav-btn="${productId}"]`).forEach(btn => {
-        btn.className = `absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-${isFav ? 'app-accent' : 'white'} hover:scale-110 transition-transform border border-white/10`;
+        btn.className = `absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-${isFav ? 'app-accent' : 'white'} hover:scale-110 transition-transform border border-white/10 shadow-md`;
         btn.innerHTML = `<svg fill="${isFav ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>`;
     });
+}
+
+function removeFavorite(productId) {
+    if (appState.favorites.has(productId)) {
+        appState.favorites.delete(productId);
+        localStorage.setItem('vape_favorites', JSON.stringify([...appState.favorites]));
+        tg.HapticFeedback.impactOccurred('light');
+        
+        updateFavoritesBadge();
+        renderFavorites();
+        
+        // Восстанавливаем цвет на главной странице, если товар там отображен (на случай, если пользователь перейдет обратно)
+        document.querySelectorAll(`[data-fav-btn="${productId}"]`).forEach(btn => {
+            btn.className = `absolute top-2 right-2 bg-black/20 backdrop-blur-md w-8 h-8 rounded-full flex items-center justify-center text-white hover:scale-110 transition-transform border border-white/10 shadow-md`;
+            btn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>`;
+        });
+    }
 }
 
 // Запуск
@@ -805,4 +961,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApp(); // Авторизация и загрузка профиля
     fetchCategories();
     fetchProducts();
+    updateFavoritesBadge();
 });

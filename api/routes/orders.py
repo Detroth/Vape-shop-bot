@@ -135,7 +135,7 @@ async def get_my_orders(
     telegram_id = int(user_data["id"])
     query = select(Order).where(
         Order.user_id == telegram_id
-    ).order_by(desc(Order.created_at)).options(selectinload(Order.items))
+    ).order_by(desc(Order.created_at)).options(selectinload(Order.items).selectinload(OrderItem.product))
     
     result = await db.execute(query)
     return result.scalars().all()
