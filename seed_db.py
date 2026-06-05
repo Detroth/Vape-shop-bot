@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.database import engine, Base, async_session_maker
-from core.models import Category, Product, Promocode, DiscountType
+from core.models import Category, Product, Promocode, DiscountType, Order, User, OrderItem
 
 async def seed():
     print("Очистка и пересоздание таблиц...")
