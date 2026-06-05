@@ -247,18 +247,15 @@ function buildProductCardsHTML(productsToRender, context = 'catalog') {
             }
         }
 
-        const safeCartKey = cartKey.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const addAction = `showProductDetails(${p.id})`;
         let cartControls = '';
         if (qty > 0) {
             cartControls = `
-                <div class="flex items-center justify-between gap-2 bg-app-accent/10 border border-app-accent/20 rounded-lg px-2 py-1.5" onclick="event.stopPropagation();">
-                    <button onclick="updateCartQuantity('${safeCartKey}', -1)" class="text-app-accent hover:text-white px-2 font-bold transition-colors">-</button>
-                    <span class="text-xs font-bold text-white w-4 text-center">${qty}</span>
-                    <button onclick="updateCartQuantity('${safeCartKey}', 1)" class="text-app-accent hover:text-white px-2 font-bold transition-colors">+</button>
-                </div>
+                <button onclick="event.stopPropagation(); ${addAction}" class="bg-app-accent/10 text-app-accent border border-app-accent/20 px-3 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-colors hover:bg-app-accent/20">
+                    В корзине: ${qty}
+                </button>
             `;
         } else {
-            const addAction = `showProductDetails(${p.id})`;
             cartControls = `
                 <button onclick="event.stopPropagation(); ${addAction}" class="bg-app-bg w-8 h-8 rounded-lg flex items-center justify-center text-app-muted hover:text-app-accent border border-white/5 transition-colors">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
