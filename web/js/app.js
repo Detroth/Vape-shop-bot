@@ -258,7 +258,7 @@ function buildProductCardsHTML(productsToRender, context = 'catalog') {
                 </div>
             `;
         } else {
-            const addAction = hasVariants ? `showProductDetails(${p.id})` : `addToCart(${p.id})`;
+            const addAction = `showProductDetails(${p.id})`;
             cartControls = `
                 <button onclick="event.stopPropagation(); ${addAction}" class="bg-app-bg w-8 h-8 rounded-lg flex items-center justify-center text-app-muted hover:text-app-accent border border-white/5 transition-colors">
                     <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
@@ -740,8 +740,8 @@ async function renderCart() {
 
         html += `
             <div class="bg-app-card rounded-2xl p-3 flex gap-3 border border-white/5 items-center">
-            <div class="w-16 h-16 bg-white rounded-xl flex items-center justify-center shrink-0 p-1">
-                    <img src="${product.image_url}" class="max-h-full max-w-full object-contain mix-blend-multiply" loading="lazy">
+            <div class="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative">
+                    <img src="${product.image_url}" class="w-full h-full object-cover" loading="lazy">
             </div>
             <div class="flex-1 min-w-0">
                 <div class="font-medium text-sm truncate mb-1">${product.name}</div>
