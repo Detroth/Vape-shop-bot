@@ -399,7 +399,7 @@ function renderFavorites() {
 // --- ЛОГИКА ДЕТАЛЬНОГО ЭКРАНА ТОВАРА ---
 
 function showProductDetails(productId) {
-    const product = appState.products.find(p => p.id === productId);
+    const product = appState.allProducts.find(p => p.id === productId);
     if (!product) return;
     
     appState.activeProduct = product;
@@ -408,26 +408,24 @@ function showProductDetails(productId) {
     document.getElementById('detail-img').src = product.image_url || '';
     document.getElementById('detail-title').textContent = product.name;
     document.getElementById('detail-desc').textContent = product.description || 'Описание отсутствует.';
-    
-    const btn = document.getElementById('detail-add-btn');
-    btn.textContent = `В корзину / ${product.price} Br`;
-    btn.onclick = () => {
-        addToCart(product.id);
-        tg.HapticFeedback.impactOccurred('medium');
-    };
 
     // Рендерим варианты (если есть в characteristics)
     const variantsContainer = document.getElementById('detail-variants');
     variantsContainer.innerHTML = '';
     
-    const colors = product.characteristics?.colors || ["Стандартный"];
+    const colors = product.characteristics?.colors || product.characteristics?.variants || ["Стандартный"];
+    appState.selectedVariant = colors[0];
+    
     colors.forEach((color, idx) => {
         const isSelected = idx === 0; // По умолчанию выбран первый
         const vBtn = document.createElement('button');
-        vBtn.className = `px-5 py-2.5 rounded-[12px] bg-app-card whitespace-nowrap text-[13px] font-medium transition-colors border ${isSelected ? 'border-app-accent text-white' : 'border-white/5 text-app-muted'}`;
+        vBtn.className = `px-5 py-2.5 rounded-[12px] bg-app-card whitespace-nowrap text-[13px] font-medium transition-colors border ${isSelected ? 'border-app-accent text-white' : 'border-white/5 text-app-muted'} active:scale-95`;
         vBtn.textContent = color;
+        vBtn.onclick = () => selectVariant(color, colors);
         variantsContainer.appendChild(vBtn);
     });
+
+    renderProductDetailsButton();
 
     // Показываем окно
     document.getElementById('tab-product-details').classList.remove('hidden');
@@ -449,6 +447,35 @@ function selectVariant(variant, allVariants) {
         vBtn.onclick = () => selectVariant(v, allVariants);
         variantsContainer.appendChild(vBtn);
     });
+    renderProductDetailsButton();
+}
+
+function renderProductDetailsButton() {
+    const container = document.getElementById('detail-action-container');
+    if (!container || !appState.activeProduct) return;
+    
+    const product = appState.activeProduct;
+    const variant = appState.selectedVariant;
+    
+    const cartKey = variant ? `${product.id}_${variant}` : `${product.id}`;
+    const qty = appState.cart[cartKey] ? appState.cart[cartKey].quantity : 0;
+    
+    if (qty > 0) {
+        container.innerHTML = `
+            <div class="w-full h-[50px] bg-app-accent/10 border border-app-accent/20 rounded-2xl flex justify-between items-center px-4">
+                <button onclick="updateCartQuantity('${cartKey}', -1)" class="text-app-accent hover:text-white px-4 py-2 font-bold text-xl transition-colors">-</button>
+                <span class="text-base font-bold text-white">${qty} шт / ${formatPrice(product.price * qty)} Br</span>
+                <button onclick="updateCartQuantity('${cartKey}', 1)" class="text-app-accent hover:text-white px-4 py-2 font-bold text-xl transition-colors">+</button>
+            </div>
+        `;
+    } else {
+        const safeVariant = variant ? `'${variant.replace(/'/g, "\\'")}'` : 'null';
+        container.innerHTML = `
+            <button onclick="addToCart(${product.id}, ${safeVariant})" class="w-full h-[50px] bg-app-accent hover:bg-blue-500 active:scale-[0.98] transition-all text-white rounded-2xl font-bold flex items-center justify-center text-[15px] shadow-[0_4px_15px_rgba(59,153,252,0.4)]">
+                В корзину / ${formatPrice(product.price)} Br
+            </button>
+        `;
+    }
 }
 
 function closeProductDetails() {
@@ -521,7 +548,7 @@ function renderOrdersList(orders) {
         
         // Формируем список купленных товаров, подтягивая имена из кэша appState.products
         const itemsHtml = o.items.map(i => {
-            const product = appState.products.find(p => p.id === i.product_id) || { name: `Товар ID: ${i.product_id}` };
+            const product = appState.allProducts.find(p => p.id === i.product_id) || { name: `Товар ID: ${i.product_id}` };
             const variantText = i.variant ? ` <span class="text-app-accent text-[10px]">(${i.variant})</span>` : '';
             return `<div class="text-[13px] text-gray-300 flex justify-between mb-1 items-center">
                         <span class="flex-1">- ${product.name}${variantText} <span class="text-white font-bold ml-1">x${i.quantity}</span></span>
@@ -575,7 +602,7 @@ function addToCart(productId, variant = null) {
     const cartItemId = variant ? `${productId}_${variant}` : `${productId}`;
     
     // Проверка остатков (Stock) при добавлении
-    const product = appState.products.find(p => p.id === productId);
+    const product = appState.allProducts.find(p => p.id === productId);
     const currentQty = appState.cart[cartItemId] ? appState.cart[cartItemId].quantity : 0;
     if (product && currentQty + 1 > product.stock) {
         tg.showAlert(`Извините, товара в наличии всего ${product.stock} шт.`);
@@ -590,6 +617,7 @@ function addToCart(productId, variant = null) {
     
     saveCart();
     tg.HapticFeedback.impactOccurred('light');
+    renderProductDetailsButton();
 }
 
 function updateCartQuantity(cartItemId, delta) {
@@ -645,7 +673,7 @@ async function renderCart() {
     cartKeys.forEach(key => {
         const item = appState.cart[key];
         // Ищем товар в кэше (в реальности, если товара нет в кэше, его нужно подтянуть)
-        const product = appState.products.find(p => p.id == item.product_id) || { id: item.product_id, name: "Неизвестный товар", price: 0, image_url: "" };
+        const product = appState.allProducts.find(p => p.id == item.product_id) || { id: item.product_id, name: "Неизвестный товар", price: 0, image_url: "" };
         localSubtotal += product.price * item.quantity;
         
         const variantHtml = item.variant ? `<div class="text-[11px] text-app-accent mb-1 font-medium">${item.variant}</div>` : '';
@@ -689,7 +717,7 @@ async function debouncedValidateCart() {
     clearTimeout(cartValidationTimeout);
     cartValidationTimeout = setTimeout(() => {
         validateCartOnBackend();
-    }, 400); 
+    }, 150); 
 }
 
 async function validateCartOnBackend() {

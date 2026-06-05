@@ -62,7 +62,7 @@ class OrderResponse(BaseModel):
     status: str
     total_price: Decimal
     promo_code_used: Optional[str]
-    address: str
+    address: Optional[str] = None
     created_at: datetime
     items: List[OrderItemResponse]
     model_config = ConfigDict(from_attributes=True)

@@ -27,7 +27,7 @@ async def cmd_admin(message: Message):
 async def notify_new_order(
     bot: Bot, admin_chat_id: int, order_id: int, client_name: str, client_phone: str, 
     tg_username: str, delivery_type: str, address: str, comment: str, items_text: str, 
-    total_price: float, promo_code_used: str = None
+    total_price: float, paid_from_balance: float = 0.0, promo_code_used: str = None
 ):
     """Отправляет уведомление о новом заказе в рабочий чат."""
     delivery_str = "Доставка" if delivery_type == "delivery" else "Самовывоз"
@@ -36,8 +36,12 @@ async def notify_new_order(
     promo_str = f" (Применен код: {promo_code_used})" if promo_code_used else ""
     tg_username_str = tg_username if tg_username else "скрыт"
 
+    status_text = "✅ Оплачен (с баланса)" if total_price - paid_from_balance <= 0 else "⏳ Ожидает оплаты"
+    balance_str = f"\n💳 <b>Списано с баланса:</b> {paid_from_balance:.2f} Br" if paid_from_balance > 0 else ""
+    to_pay = total_price - paid_from_balance
+
     text = (
-        f"📦 <b>ПОСТУПИЛ НОВЫЙ ЗАКАЗ №{order_id}</b> 📦\n"
+        f"📦 <b>ПОСТУПИЛ НОВЫЙ ЗАКАЗ №{order_id}</b> [{status_text}]\n"
         f"---------------------------------\n"
         f"👤 <b>Клиент:</b> {client_name}\n"
         f"📞 <b>Телефон:</b> {client_phone}\n"
@@ -48,7 +52,8 @@ async def notify_new_order(
         f"---------------------------------\n"
         f"🛒 <b>Товары:</b>\n"
         f"{items_text}\n\n"
-        f"💵 <b>Итого к оплате:</b> {total_price:.2f} Br{promo_str}"
+        f"💰 <b>Сумма заказа:</b> {total_price:.2f} Br{promo_str}{balance_str}\n"
+        f"💵 <b>Итого к оплате:</b> {to_pay:.2f} Br"
     )
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[

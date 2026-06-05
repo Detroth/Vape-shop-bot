@@ -119,7 +119,8 @@ async def create_order(
                 address=request.address,
                 comment=request.comment,
                 items_text=items_text, 
-                total_price=float(final_total - paid_from_balance),
+                total_price=float(final_total),
+                paid_from_balance=float(paid_from_balance),
                 promo_code_used=request.promo_code if promo else None
             )
         except Exception:
