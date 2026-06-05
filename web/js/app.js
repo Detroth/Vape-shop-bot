@@ -620,15 +620,42 @@ function addToCart(productId, variant = null) {
     saveCart();
     tg.HapticFeedback.impactOccurred('light');
     renderProductDetailsButton();
+    refreshActiveTabProducts();
 }
 
 function updateCartQuantity(cartItemId, delta) {
     if (!appState.cart[cartItemId]) return;
-    appState.cart[cartItemId].quantity += delta;
-    if (appState.cart[cartItemId].quantity <= 0) delete appState.cart[cartItemId];
-    saveCart();
-    tg.HapticFeedback.selectionChanged();
-    renderCart();
+    
+    // Проверка остатков (Stock)
+    const item = appState.cart[cartItemId];
+    const product = appState.allProducts.find(p => p.id == item.product_id);
+    if (product && delta > 0 && item.quantity + delta > product.stock) {
+        tg.showAlert(`Извините, товара в наличии всего ${product.stock} шт.`);
+        return;
+    }
+    
+    item.quantity += delta;
+    if (item.quantity <= 0) {
+        delete appState.cart[cartItemId];
+        saveCart();
+        tg.HapticFeedback.selectionChanged();
+        renderCart();
+    } else {
+        saveCart();
+        tg.HapticFeedback.selectionChanged();
+        
+        if (product) {
+            const safeKeyForQuery = cartItemId.replace(/"/g, '\\"');
+            const qtyEl = document.querySelector(`[data-qty="${safeKeyForQuery}"]`);
+            const priceEl = document.querySelector(`[data-price="${safeKeyForQuery}"]`);
+            if (qtyEl) qtyEl.textContent = item.quantity;
+            if (priceEl) priceEl.textContent = `${formatPrice(product.price * item.quantity)} Br`;
+        }
+        updateCartTotalsDOM();
+        debouncedValidateCart();
+    }
+    renderProductDetailsButton();
+    refreshActiveTabProducts();
 }
 
 function removeFromCart(cartItemId) {
@@ -636,20 +663,42 @@ function removeFromCart(cartItemId) {
     saveCart();
     tg.HapticFeedback.impactOccurred('medium');
     renderCart();
+    renderProductDetailsButton();
+    refreshActiveTabProducts();
 }
 
 function updateCartTotalsDOM() {
     let localSubtotal = 0;
     Object.keys(appState.cart).forEach(key => {
         const item = appState.cart[key];
-        const product = appState.products.find(p => p.id == item.product_id);
+        const product = appState.allProducts.find(p => p.id == item.product_id);
         if (product) localSubtotal += product.price * item.quantity;
     });
     const subEl = document.getElementById('cart-subtotal');
     const totEl = document.getElementById('cart-total');
+    const discRow = document.getElementById('cart-discount-row');
+    const discLabel = document.getElementById('cart-discount-label');
+    const discVal = document.getElementById('cart-discount-val');
+    
     if (subEl) subEl.textContent = `${formatPrice(localSubtotal)} Br`;
-    // Итого временно равно сабтоталу, пока сервер не ответит про промокоды
-    if (totEl && !appState.promoCode) totEl.textContent = `${formatPrice(localSubtotal)} Br`; 
+    
+    let discount = 0;
+    if (appState.profile && appState.profile.personal_discount > 0) {
+        discount += localSubtotal * (appState.profile.personal_discount / 100);
+    }
+    
+    let finalTotal = Math.max(0, localSubtotal - discount);
+    
+    if (!appState.promoCode) {
+        if (totEl) totEl.textContent = `${formatPrice(finalTotal)} Br`;
+        if (discount > 0 && discRow) {
+            discRow.classList.remove('hidden');
+            if (discLabel) discLabel.textContent = 'Персональная скидка';
+            if (discVal) discVal.textContent = `-${formatPrice(discount)} Br`;
+        } else if (discRow) {
+            discRow.classList.add('hidden');
+        }
+    }
 }
 
 async function renderCart() {
