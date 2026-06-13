@@ -1,5 +1,6 @@
 import asyncio
 import re
+import os
 import logging
 import uvicorn
 from contextlib import asynccontextmanager
@@ -97,6 +98,11 @@ async def db_status_check():
             return {"status": "ok", "tables_in_postgres": tables, "models_in_app": list(Base.metadata.tables.keys())}
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+@app.get("/api/config", tags=["System"])
+async def get_public_config():
+    """Отдает публичные настройки для Mini App."""
+    return {"support_account": os.getenv("SUPPORT_ACCOUNT", "")}
 
 # Монтируем статику в корень (ДОЛЖНО БЫТЬ В САМОМ НИЗУ, чтобы не перекрыть /api и /admin)
 app.mount("/", StaticFiles(directory="web", html=True), name="web")
