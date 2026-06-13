@@ -90,7 +90,9 @@ class ProductAdmin(admin.ModelAdmin):
     page_schema = "Товары"
     label = "Товары"
     model = Product
-    schema = ProductSchema
+    schema_read = ProductSchema
+    schema_create = ProductSchema
+    schema_update = ProductSchema
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
@@ -106,14 +108,15 @@ class ProductAdmin(admin.ModelAdmin):
         return table
         
     async def get_form_item(self, request, modelfield, **kwargs):
-        item = await super().get_form_item(request, modelfield, **kwargs)
+        # Перехватываем characteristics ДО базового парсера, чтобы избежать ошибки 500
+        field_name = getattr(modelfield, 'name', '')
         
-        if item:
-            if getattr(item, 'name', '') == 'characteristics':
-                item = InputKV(name="characteristics", label="Характеристики")
+        if field_name == 'characteristics':
+            return InputKV(name="characteristics", label="Характеристики")
                 
-            if getattr(item, 'name', '') == 'category_id':
-                item.searchable = False 
+        item = await super().get_form_item(request, modelfield, **kwargs)
+        if item and field_name == 'category_id':
+            item.searchable = False 
             
         return item
 
@@ -122,7 +125,9 @@ class OrderAdmin(admin.ModelAdmin):
     page_schema = "Заказы"
     label = "Заказы"
     model = Order
-    schema = OrderSchema
+    schema_read = OrderSchema
+    schema_create = OrderSchema
+    schema_update = OrderSchema
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
@@ -165,7 +170,9 @@ class UserAdmin(admin.ModelAdmin):
     label = "Пользователи"
     model = User
     pk_name = "telegram_id"
-    schema = UserSchema
+    schema_read = UserSchema
+    schema_create = UserSchema
+    schema_update = UserSchema
     search_fields = [User.username, User.telegram_id]
     
     async def get_list_table(self, request):
