@@ -48,36 +48,6 @@ site = AdminSite(
     engine=engine
 )
 
-# --- Строгие схемы для Админ-панели ---
-class ProductSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: Optional[int] = None
-    category_id: int
-    name: str
-    description: Optional[str] = None
-    price: float
-    image_url: Optional[str] = None
-    stock: int
-    characteristics: Optional[dict] = None
-
-class OrderSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: Optional[int] = None
-    user_id: int
-    status: str
-    total_price: float
-    promo_code_used: Optional[str] = None
-    address: Optional[str] = None
-    created_at: Optional[datetime] = None
-
-class UserSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    telegram_id: int
-    username: Optional[str] = None
-    balance: float
-    bonus_points: int
-    personal_discount: int
-
 @site.register_admin
 class CategoryAdmin(admin.ModelAdmin):
     page_schema = "Категории"
@@ -90,23 +60,9 @@ class ProductAdmin(admin.ModelAdmin):
     page_schema = "Товары"
     label = "Товары"
     model = Product
-    schema_read = ProductSchema
-    schema_create = ProductSchema
-    schema_update = ProductSchema
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
-    async def get_list_table(self, request):
-        table = await super().get_list_table(request)
-        for col in table.columns:
-            name = getattr(col, 'name', '')
-            if name == 'image_url':
-                col.type = 'image'
-                col.enlargeAble = True
-            elif name == 'stock':
-                col.quickEdit = {"mode": "inline"}  # Делает поле редактируемым из таблицы
-        return table
-        
     async def get_form_item(self, request, modelfield, **kwargs):
         # Перехватываем characteristics ДО базового парсера, чтобы избежать ошибки 500
         field_name = getattr(modelfield, 'name', '')
@@ -125,27 +81,6 @@ class OrderAdmin(admin.ModelAdmin):
     page_schema = "Заказы"
     label = "Заказы"
     model = Order
-    schema_read = OrderSchema
-    schema_create = OrderSchema
-    schema_update = OrderSchema
-    
-    async def get_list_table(self, request):
-        table = await super().get_list_table(request)
-        for col in table.columns:
-            name = getattr(col, 'name', '')
-            if name == 'status':
-                col.type = 'mapping'
-                col.map = {
-                    "OrderStatus.PENDING": "<span class='text-yellow-500 font-bold'>Ожидает</span>",
-                    "OrderStatus.PAID": "<span class='text-blue-500 font-bold'>Оплачен</span>",
-                    "OrderStatus.DELIVERED": "<span class='text-green-500 font-bold'>Доставлен</span>",
-                    "OrderStatus.CANCELED": "<span class='text-red-500 font-bold'>Отменен</span>",
-                    "pending": "<span class='text-yellow-500 font-bold'>Ожидает</span>",
-                    "paid": "<span class='text-blue-500 font-bold'>Оплачен</span>",
-                    "delivered": "<span class='text-green-500 font-bold'>Доставлен</span>",
-                    "canceled": "<span class='text-red-500 font-bold'>Отменен</span>"
-                }
-        return table
 
 @site.register_admin
 class PromocodeAdmin(admin.ModelAdmin):
@@ -153,16 +88,6 @@ class PromocodeAdmin(admin.ModelAdmin):
     label = "Промокоды"
     model = Promocode
     search_fields = [Promocode.code]
-    
-    async def get_list_table(self, request):
-        table = await super().get_list_table(request)
-        for col in table.columns:
-            name = getattr(col, 'name', '')
-            if name == 'current_uses':
-                col.label = "Использовано"
-                col.type = "tpl"
-                col.tpl = "${current_uses} / ${max_uses}"
-        return table
 
 @site.register_admin
 class UserAdmin(admin.ModelAdmin):
@@ -170,18 +95,7 @@ class UserAdmin(admin.ModelAdmin):
     label = "Пользователи"
     model = User
     pk_name = "telegram_id"
-    schema_read = UserSchema
-    schema_create = UserSchema
-    schema_update = UserSchema
     search_fields = [User.username, User.telegram_id]
-    
-    async def get_list_table(self, request):
-        table = await super().get_list_table(request)
-        for col in table.columns:
-            name = getattr(col, 'name', '')
-            if name in ('balance', 'bonus_points', 'personal_discount'):
-                col.quickEdit = {"mode": "inline"}
-        return table
 
 def setup_admin(app: FastAPI):
     app.add_middleware(AdminAuthMiddleware)
