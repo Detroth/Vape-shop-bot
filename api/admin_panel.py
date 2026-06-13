@@ -63,14 +63,14 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
-    async def get_form_item(self, request, modelfield, **kwargs):
+    async def get_form_item(self, request, modelfield, action, **kwargs):
         # Перехватываем characteristics ДО базового парсера, чтобы избежать ошибки 500
         field_name = getattr(modelfield, 'name', '')
         
         if field_name == 'characteristics':
             return InputKV(name="characteristics", label="Характеристики")
                 
-        item = await super().get_form_item(request, modelfield, **kwargs)
+        item = await super().get_form_item(request, modelfield, action, **kwargs)
         if item and field_name == 'category_id':
             item.searchable = False 
             
