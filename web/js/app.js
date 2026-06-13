@@ -29,7 +29,9 @@ const appState = {
     activeProduct: null,
     selectedVariant: null,
     promoCode: null,
-    searchResults: null
+    searchResults: null,
+    sortBy: 'default',
+    filterInStock: false
 };
 
 // Строгое получение реальных данных авторизации от Telegram (никаких заглушек)
@@ -209,17 +211,30 @@ async function fetchProducts() {
 }
 
 function filterAndRenderProducts() {
-    let filtered = appState.allProducts;
+    // Делаем копию массива, чтобы сортировка не изменяла исходный порядок базы
+    let filtered = [...appState.allProducts];
     
     // Фильтр по категории
     if (appState.activeCategoryId !== null) {
         filtered = filtered.filter(p => p.category_id === appState.activeCategoryId);
     }
     
+    // Фильтр по наличию
+    if (appState.filterInStock) {
+        filtered = filtered.filter(p => p.stock > 0);
+    }
+    
     // Фильтр по поиску
     const query = document.getElementById('catalog-search').value.trim().toLowerCase();
     if (query) {
         filtered = filtered.filter(p => p.name.toLowerCase().includes(query) || (p.description && p.description.toLowerCase().includes(query)));
+    }
+    
+    // Сортировка
+    if (appState.sortBy === 'price_asc') {
+        filtered.sort((a, b) => a.price - b.price);
+    } else if (appState.sortBy === 'price_desc') {
+        filtered.sort((a, b) => b.price - a.price);
     }
     
     appState.products = filtered;
@@ -363,6 +378,98 @@ function handleDedicatedSearch() {
             empty.classList.remove('hidden');
         }
     }, 300);
+}
+
+// --- ЛОГИКА СОРТИРОВКИ ---
+function openSortModal() {
+    const modal = document.getElementById('sort-modal');
+    const content = document.getElementById('sort-modal-content');
+    modal.classList.remove('hidden');
+    
+    // Подсветка активного чекмарка и кнопки
+    document.querySelectorAll('#sort-modal .checkmark').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('#sort-modal button.border-app-accent').forEach(el => {
+        el.classList.remove('border-app-accent', 'bg-app-accent/10');
+        el.classList.add('border-transparent');
+    });
+    
+    const activeBtn = document.getElementById(`sort-btn-${appState.sortBy}`);
+    if (activeBtn) {
+        activeBtn.querySelector('.checkmark').classList.remove('hidden');
+        activeBtn.classList.remove('border-transparent');
+        activeBtn.classList.add('border-app-accent', 'bg-app-accent/10');
+    }
+
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        content.classList.remove('translate-y-full');
+    }, 10);
+}
+
+function closeSortModal() {
+    const modal = document.getElementById('sort-modal');
+    const content = document.getElementById('sort-modal-content');
+    modal.classList.add('opacity-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+function applySort(type) {
+    appState.sortBy = type;
+    tg.HapticFeedback.selectionChanged();
+    closeSortModal();
+    filterAndRenderProducts();
+    
+    // Подкрашиваем кнопку вверху синим, если сортировка изменена
+    const sortBtn = document.getElementById('btn-open-sort');
+    if (sortBtn) {
+        if (type !== 'default') sortBtn.classList.replace('text-app-text', 'text-app-accent');
+        else sortBtn.classList.replace('text-app-accent', 'text-app-text');
+    }
+}
+
+// --- ЛОГИКА ФИЛЬТРОВ ---
+let tempFilterInStock = false;
+
+function openFilterModal() {
+    const modal = document.getElementById('filter-modal');
+    const content = document.getElementById('filter-modal-content');
+    
+    tempFilterInStock = appState.filterInStock;
+    document.getElementById('filter-instock-toggle').checked = tempFilterInStock;
+
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        content.classList.remove('translate-y-full');
+    }, 10);
+}
+
+function closeFilterModal() {
+    const modal = document.getElementById('filter-modal');
+    const content = document.getElementById('filter-modal-content');
+    modal.classList.add('opacity-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+function toggleInStockFilter(checked) {
+    tempFilterInStock = checked;
+    tg.HapticFeedback.selectionChanged();
+}
+
+function applyFilters() {
+    appState.filterInStock = tempFilterInStock;
+    tg.HapticFeedback.impactOccurred('light');
+    closeFilterModal();
+    filterAndRenderProducts();
+    
+    // Показываем синюю точку на иконке фильтров
+    const dot = document.getElementById('filter-active-dot');
+    if (dot) {
+        if (appState.filterInStock) dot.classList.remove('hidden');
+        else dot.classList.add('hidden');
+    }
 }
 
 // --- ЛОГИКА ВКЛАДКИ ИЗБРАННОГО ---

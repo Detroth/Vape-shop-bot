@@ -65,13 +65,14 @@
                     </div>
                     
                     <!-- Кнопка Сортировка -->
-                    <button class="bg-app-card p-2.5 rounded-xl text-app-text hover:text-app-accent transition-colors">
+                    <button id="btn-open-sort" onclick="openSortModal()" class="bg-app-card p-2.5 rounded-xl text-app-text hover:text-app-accent transition-colors">
                         <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
                         </svg>
                     </button>
                     <!-- Кнопка Фильтры -->
-                    <button class="bg-app-card p-2.5 rounded-xl text-app-text hover:text-app-accent transition-colors">
+                    <button id="btn-open-filter" onclick="openFilterModal()" class="bg-app-card p-2.5 rounded-xl text-app-text hover:text-app-accent transition-colors relative">
+                        <span id="filter-active-dot" class="hidden absolute top-2 right-2.5 w-2 h-2 bg-app-accent rounded-full border border-app-card"></span>
                         <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
                         </svg>
@@ -249,6 +250,38 @@
         </button>
 
     </nav>
+
+    <!-- Модальное окно: Сортировка -->
+    <div id="sort-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] hidden flex items-end justify-center opacity-0 transition-opacity">
+        <div class="bg-app-card w-full rounded-t-3xl p-5 pb-8 border-t border-white/10 shadow-2xl transform translate-y-full transition-transform duration-300" id="sort-modal-content">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold">Сортировка</h3>
+                <button onclick="closeSortModal()" class="text-app-muted hover:text-white p-1 bg-white/5 rounded-full"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="space-y-2">
+                <button onclick="applySort('default')" class="w-full text-left p-4 rounded-xl hover:bg-white/5 bg-app-bg/50 transition-colors flex justify-between items-center border border-transparent" id="sort-btn-default">По умолчанию <svg class="w-5 h-5 text-app-accent hidden checkmark" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></button>
+                <button onclick="applySort('price_asc')" class="w-full text-left p-4 rounded-xl hover:bg-white/5 bg-app-bg/50 transition-colors flex justify-between items-center border border-transparent" id="sort-btn-price_asc">Сначала дешевле <svg class="w-5 h-5 text-app-accent hidden checkmark" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></button>
+                <button onclick="applySort('price_desc')" class="w-full text-left p-4 rounded-xl hover:bg-white/5 bg-app-bg/50 transition-colors flex justify-between items-center border border-transparent" id="sort-btn-price_desc">Сначала дороже <svg class="w-5 h-5 text-app-accent hidden checkmark" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Фильтры -->
+    <div id="filter-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] hidden flex items-end justify-center opacity-0 transition-opacity">
+        <div class="bg-app-card w-full rounded-t-3xl p-5 pb-8 border-t border-white/10 shadow-2xl transform translate-y-full transition-transform duration-300" id="filter-modal-content">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold">Фильтры</h3>
+                <button onclick="closeFilterModal()" class="text-app-muted hover:text-white p-1 bg-white/5 rounded-full"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="bg-app-bg/50 rounded-xl p-4 mb-6 border border-white/5">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium">Только товары в наличии</span>
+                    <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="filter-instock-toggle" class="sr-only peer" onchange="toggleInStockFilter(this.checked)"><div class="w-11 h-6 bg-app-card peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-app-muted peer-checked:after:bg-white after:border-white/10 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-app-accent border border-white/10"></div></label>
+                </div>
+            </div>
+            <button onclick="applyFilters()" class="w-full bg-app-accent hover:bg-blue-500 py-3.5 rounded-xl font-bold transition-colors shadow-lg">Показать товары</button>
+        </div>
+    </div>
 
     <!-- Модальное окно: Промокод -->
     <div id="promo-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4 opacity-0 transition-opacity">
