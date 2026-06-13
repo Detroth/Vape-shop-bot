@@ -536,6 +536,23 @@ function showProductDetails(productId) {
         appState.selectedVariant = null;
         if (variantsTitle) variantsTitle.classList.add('hidden');
     }
+    
+    // Рендерим характеристики (Исключая variants/colors, так как они в кнопках)
+    const charContainer = document.getElementById('detail-characteristics');
+    charContainer.innerHTML = '';
+    if (product.characteristics) {
+        let charHtml = '';
+        const skipKeys = ['variants', 'colors'];
+        for (const [key, value] of Object.entries(product.characteristics)) {
+            if (!skipKeys.includes(key)) {
+                // Выводим Ключ - Значение
+                charHtml += `<div class="flex justify-between items-center py-2.5 border-b border-white/5 last:border-0"><span class="text-app-muted text-[13px]">${key}</span><span class="text-[13px] font-medium text-white text-right max-w-[60%] leading-tight">${value}</span></div>`;
+            }
+        }
+        if (charHtml) {
+            charContainer.innerHTML = `<h3 class="text-xs font-semibold text-app-muted uppercase tracking-wider mt-6 mb-2">Характеристики</h3><div class="bg-app-bg/50 rounded-xl px-4 py-1 border border-white/5 shadow-inner">${charHtml}</div>`;
+        }
+    }
 
     renderProductDetailsButton();
 

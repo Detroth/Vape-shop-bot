@@ -4,6 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi_amis_admin.admin.site import AdminSite
 from fastapi_amis_admin.admin.settings import Settings as AdminSettings
 from fastapi_amis_admin.admin import admin
+from fastapi_amis_admin.amis.components import InputKV
 from sqlalchemy.types import String
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any
@@ -104,6 +105,17 @@ class ProductAdmin(admin.ModelAdmin):
             elif name == 'stock':
                 col.quickEdit = {"mode": "inline"}  # Делает поле редактируемым из таблицы
         return table
+        
+    async def get_form_item(self, request, modelfield, **kwargs):
+        item = await super().get_form_item(request, modelfield, **kwargs)
+        
+        if modelfield.name == 'characteristics':
+            item = InputKV(name="characteristics", label="Характеристики", value_type="text")
+            
+        if modelfield.name == 'category_id':
+            item.searchable = False 
+            
+        return item
 
 @site.register_admin
 class OrderAdmin(admin.ModelAdmin):
