@@ -40,6 +40,12 @@
 </head>
 <body class="h-screen overflow-hidden flex flex-col bg-app-bg text-app-text select-none font-sans">
 
+    <!-- Экран загрузки (Loader) -->
+    <div id="app-loader" class="fixed inset-0 bg-app-bg z-[100] flex flex-col items-center justify-center transition-opacity duration-300">
+        <div class="w-12 h-12 border-4 border-app-card border-t-app-accent rounded-full animate-spin mb-4"></div>
+        <div class="text-app-muted font-medium text-sm animate-pulse">Загрузка магазина...</div>
+    </div>
+
     <!-- Глобальный контейнер контента -->
     <div id="app-content" class="flex-1 overflow-y-auto pb-32">
         

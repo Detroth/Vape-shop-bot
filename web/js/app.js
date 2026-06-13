@@ -71,7 +71,6 @@ async function initializeApp() {
             // Сразу обновляем интерфейс
             renderProfile(userData);
             
-            // Если есть лоадер, здесь его можно скрыть: document.getElementById('loader')?.classList.add('hidden');
             switchTab('catalog');
         } else {
             console.error("Ошибка авторизации. Статус:", response.status);
@@ -136,8 +135,9 @@ function switchTab(tabName) {
         loadUserProfile(); // Параллельно тянем свежие данные (баланс)
     }
     
-    if (tabName === 'favorites') {
-        renderFavorites();
+    // Обновляем визуал карточек (кнопки корзины) при переходе
+    if (tabName === 'catalog' || tabName === 'search' || tabName === 'favorites') {
+        refreshActiveTabProducts();
     }
 
     // 3. Обновляем цвета кнопок в навигации
@@ -1040,10 +1040,21 @@ function removeFavorite(productId) {
 }
 
 // Запуск
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     renderProfileHeader(); // Моментально показываем имя из Telegram
-    initializeApp(); // Авторизация и загрузка профиля
-    fetchCategories();
-    fetchProducts();
     updateFavoritesBadge();
+    
+    // Запускаем все запросы к API параллельно для максимальной скорости загрузки
+    await Promise.all([
+        initializeApp(), // Авторизация
+        fetchCategories(), // Загрузка категорий
+        fetchProducts() // Загрузка товаров
+    ]);
+    
+    // Когда все данные загружены — плавно прячем лоадер
+    const loader = document.getElementById('app-loader');
+    if (loader) {
+        loader.classList.add('opacity-0');
+        setTimeout(() => loader.classList.add('hidden'), 300);
+    }
 });
