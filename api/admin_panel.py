@@ -48,10 +48,10 @@ site = AdminSite(
     engine=engine
 )
 
-# --- Схемы только для ЧТЕНИЯ из БД (чтобы избежать ValidationError при None) ---
-class ProductRead(BaseModel):
+# --- Строгие схемы для Админ-панели ---
+class ProductSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: int
+    id: Optional[int] = None
     category_id: int
     name: str
     description: Optional[str] = None
@@ -60,9 +60,9 @@ class ProductRead(BaseModel):
     stock: int
     characteristics: Optional[dict] = None
 
-class OrderRead(BaseModel):
+class OrderSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: int
+    id: Optional[int] = None
     user_id: int
     status: str
     total_price: float
@@ -70,7 +70,7 @@ class OrderRead(BaseModel):
     address: Optional[str] = None
     created_at: Optional[datetime] = None
 
-class UserRead(BaseModel):
+class UserSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     telegram_id: int
     username: Optional[str] = None
@@ -90,7 +90,7 @@ class ProductAdmin(admin.ModelAdmin):
     page_schema = "Товары"
     label = "Товары"
     model = Product
-    schema_read = ProductRead
+    schema = ProductSchema
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
@@ -122,7 +122,7 @@ class OrderAdmin(admin.ModelAdmin):
     page_schema = "Заказы"
     label = "Заказы"
     model = Order
-    schema_read = OrderRead
+    schema = OrderSchema
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
@@ -165,7 +165,7 @@ class UserAdmin(admin.ModelAdmin):
     label = "Пользователи"
     model = User
     pk_name = "telegram_id"
-    schema_read = UserRead
+    schema = UserSchema
     search_fields = [User.username, User.telegram_id]
     
     async def get_list_table(self, request):
