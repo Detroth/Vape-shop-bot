@@ -58,7 +58,7 @@ class ProductRead(BaseModel):
     price: float
     image_url: Optional[str] = None
     stock: int
-    characteristics: Optional[Any] = None
+    characteristics: Optional[dict] = None
 
 class OrderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -90,8 +90,7 @@ class ProductAdmin(admin.ModelAdmin):
     page_schema = "Товары"
     label = "Товары"
     model = Product
-    schema = ProductRead
-    schema_model = ProductRead
+    schema_read = ProductRead
     search_fields = [Product.name]
     list_filter = [Product.category_id]
     
@@ -109,11 +108,12 @@ class ProductAdmin(admin.ModelAdmin):
     async def get_form_item(self, request, modelfield, **kwargs):
         item = await super().get_form_item(request, modelfield, **kwargs)
         
-        if modelfield.name == 'characteristics':
-            item = InputKV(name="characteristics", label="Характеристики", value_type="text")
-            
-        if modelfield.name == 'category_id':
-            item.searchable = False 
+        if item:
+            if getattr(item, 'name', '') == 'characteristics':
+                item = InputKV(name="characteristics", label="Характеристики")
+                
+            if getattr(item, 'name', '') == 'category_id':
+                item.searchable = False 
             
         return item
 
@@ -122,8 +122,7 @@ class OrderAdmin(admin.ModelAdmin):
     page_schema = "Заказы"
     label = "Заказы"
     model = Order
-    schema = OrderRead
-    schema_model = OrderRead
+    schema_read = OrderRead
     
     async def get_list_table(self, request):
         table = await super().get_list_table(request)
@@ -166,8 +165,7 @@ class UserAdmin(admin.ModelAdmin):
     label = "Пользователи"
     model = User
     pk_name = "telegram_id"
-    schema = UserRead
-    schema_model = UserRead
+    schema_read = UserRead
     search_fields = [User.username, User.telegram_id]
     
     async def get_list_table(self, request):
