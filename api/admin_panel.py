@@ -53,7 +53,6 @@ class CategoryAdmin(admin.ModelAdmin):
     page_schema = "Категории"
     label = "Категории"
     model = Category
-    search_fields = [Category.name]
 
 @site.register_admin
 class ProductAdmin(admin.ModelAdmin):
