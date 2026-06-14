@@ -855,6 +855,18 @@ async function renderCart() {
     emptyState.classList.add('hidden');
     receipt.classList.remove('hidden');
     
+    const promoBtn = document.querySelector('button[onclick="openPromoModal()"]');
+    if (promoBtn) {
+        promoBtn.textContent = appState.promoCode ? `Промокод: ${appState.promoCode}` : 'Активировать промокод';
+        if(appState.promoCode) {
+            promoBtn.classList.add('text-app-accent', 'border-app-accent/30');
+            promoBtn.classList.remove('text-app-muted', 'border-white/5');
+        } else {
+            promoBtn.classList.remove('text-app-accent', 'border-app-accent/30');
+            promoBtn.classList.add('text-app-muted', 'border-white/5');
+        }
+    }
+    
     let localSubtotal = 0;
     let html = '';
 
@@ -953,6 +965,11 @@ function updateCartBadges() {
 function openPromoModal() {
     const modal = document.getElementById('promo-modal');
     const content = document.getElementById('promo-modal-content');
+    
+    document.getElementById('promo-input').value = appState.promoCode || '';
+    document.getElementById('promo-error').classList.add('hidden');
+    document.getElementById('promo-success').classList.add('hidden');
+    
     modal.classList.remove('hidden');
     setTimeout(() => {
         modal.classList.remove('opacity-0');
@@ -968,13 +985,59 @@ function closePromoModal() {
     setTimeout(() => modal.classList.add('hidden'), 200);
 }
 
-function applyPromo() {
+async function applyPromo() {
     const val = document.getElementById('promo-input').value.trim().toUpperCase();
-    if (!val) return;
-    appState.promoCode = val;
-    tg.HapticFeedback.impactOccurred('medium');
-    closePromoModal();
-    renderCart(); // Перерендерит и вызовет валидацию
+    const errEl = document.getElementById('promo-error');
+    const succEl = document.getElementById('promo-success');
+    
+    errEl.classList.add('hidden');
+    succEl.classList.add('hidden');
+
+    if (!val) {
+        appState.promoCode = null;
+        closePromoModal();
+        renderCart();
+        return;
+    }
+
+    const btn = document.querySelector('#promo-modal-content button.bg-app-accent');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
+
+    try {
+        const items = Object.values(appState.cart).map(i => ({ product_id: i.product_id, quantity: i.quantity, variant: i.variant }));
+        const res = await apiFetch('/api/cart/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items, promo_code: val })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            if (data.promo_status === 'valid') {
+                appState.promoCode = val;
+                succEl.textContent = "Промокод успешно применен!";
+                succEl.classList.remove('hidden');
+                tg.HapticFeedback.notificationOccurred('success');
+                setTimeout(() => { closePromoModal(); renderCart(); }, 1000);
+            } else {
+                appState.promoCode = null;
+                errEl.textContent = "Такого промокода не существует или он истек";
+                errEl.classList.remove('hidden');
+                tg.HapticFeedback.notificationOccurred('error');
+                renderCart(); // сбрасываем скидку, если она была применена ранее
+            }
+        } else {
+            throw new Error('API Error');
+        }
+    } catch (e) {
+        errEl.textContent = "Ошибка проверки промокода";
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
 }
 
 // --- ЛОГИКА ДЕПОЗИТОВ (MOCK) ---
@@ -1034,6 +1097,23 @@ async function submitDeposit() {
 let checkoutDeliveryType = 'delivery';
 
 function openCheckoutScreen() {
+    // --- ПРОВЕРКА ОСТАТКОВ ПЕРЕД ОФОРМЛЕНИЕМ ---
+    let outOfStock = false;
+    let outOfStockMsg = '';
+    
+    Object.values(appState.cart).forEach(item => {
+        const product = appState.allProducts.find(p => p.id === item.product_id);
+        if (product && item.quantity > product.stock) {
+            outOfStock = true;
+            outOfStockMsg += `\n- ${product.name} (В наличии: ${product.stock} шт.)`;
+        }
+    });
+    
+    if (outOfStock) {
+        tg.showAlert(`Недостаточно товара на складе:${outOfStockMsg}\n\nПожалуйста, уменьшите количество в корзине.`);
+        return; // Прерываем открытие экрана оформления
+    }
+
     // Заполняем скрытый инпут ником
     const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
     if (tgUser && tgUser.username) {

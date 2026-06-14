@@ -42,7 +42,7 @@ async def create_order(
         if not product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         if product.stock < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Товара '{product.name}' осталось всего {product.stock} шт.")
+            raise HTTPException(status_code=400, detail=f"Извините, товара '{product.name}' осталось всего {product.stock} шт.")
             
         base_total += product.price * item.quantity
         product_updates.append((product, item.quantity))
@@ -62,7 +62,7 @@ async def create_order(
             
             promo.current_uses += 1
         else:
-            raise HTTPException(status_code=400, detail="Invalid or exhausted promo code")
+            raise HTTPException(status_code=400, detail="Промокод не существует или его лимит исчерпан")
 
     final_total = max(Decimal("0.00"), base_total)
 
