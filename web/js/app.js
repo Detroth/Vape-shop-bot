@@ -835,6 +835,7 @@ function updateCartTotalsDOM() {
             if (discVal) discVal.textContent = `-${formatPrice(discount)} Br`;
         } else if (discRow) {
             discRow.classList.add('hidden');
+        }
     }
     
     if (appState.activeBonus && appState.activeBonus.type === 'discount') {
