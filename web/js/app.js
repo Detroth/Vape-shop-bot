@@ -1143,6 +1143,19 @@ async function loadDeliveryTimes() {
     } catch (e) { console.error("Ошибка загрузки времени"); }
 }
 
+async function loadDeliveryPrice() {
+    try {
+        const res = await apiFetch('/api/orders/delivery-price');
+        if (res.ok) {
+            const data = await res.json();
+            const info = document.getElementById('checkout-paid-delivery-info');
+            if (info && data.price) {
+                info.innerText = `Стоимость платной доставки (${data.price} Br) будет добавлена к итоговой сумме заказа.`;
+            }
+        }
+    } catch (e) { console.error("Ошибка загрузки цены доставки"); }
+}
+
 function renderDeliveryDates() {
     const container = document.getElementById('checkout-dates');
     if (!container) return;
@@ -1224,6 +1237,7 @@ function openCheckoutScreen() {
     tg.BackButton.onClick(closeCheckoutScreen);
     
     loadDeliveryTimes();
+    loadDeliveryPrice();
     renderDeliveryDates();
 }
 

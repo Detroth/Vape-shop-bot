@@ -155,6 +155,10 @@ async def create_order(
         
     return {"status": "success", "order_id": new_order.id}
 
+@router.get("/delivery-price")
+async def get_delivery_price():
+    return {"price": float(settings.paid_delivery_price)}
+
 @router.get("/delivery-times", response_model=List[DeliveryTimeResponse])
 async def get_delivery_times(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(DeliveryTime).where(DeliveryTime.is_active == True))
