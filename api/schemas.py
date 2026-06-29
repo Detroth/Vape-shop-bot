@@ -42,6 +42,8 @@ class OrderCreateRequest(BaseModel):
     promo_code: Optional[str] = None
     activated_bonus_id: Optional[int] = None
     delivery_type: str = "delivery"
+    delivery_date: Optional[str] = None
+    delivery_time: Optional[str] = None
     client_name: str
     client_phone: str
     address: Optional[str] = None
@@ -67,4 +69,9 @@ class OrderResponse(BaseModel):
     address: Optional[str] = None
     created_at: datetime
     items: List[OrderItemResponse]
+    model_config = ConfigDict(from_attributes=True)
+
+class DeliveryTimeResponse(BaseModel):
+    id: int
+    time_slot: str
     model_config = ConfigDict(from_attributes=True)

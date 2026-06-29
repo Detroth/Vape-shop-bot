@@ -8,10 +8,10 @@ from aiogram import Bot
 
 from core.config import settings
 from core.database import get_db
-from core.models import Order, OrderItem, OrderStatus, Product, User, Promocode, DiscountType, UserBonus, PrizeType
+from core.models import Order, OrderItem, OrderStatus, Product, User, Promocode, DiscountType, UserBonus, PrizeType, DeliveryTime
 from api.dependencies import verify_telegram_webapp_data
 from bot.handlers.admin import notify_new_order
-from api.schemas import OrderCreateRequest, OrderResponse
+from api.schemas import OrderCreateRequest, OrderResponse, DeliveryTimeResponse
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -81,6 +81,9 @@ async def create_order(
             elif active_bonus.prize_type == PrizeType.PRODUCT:
                 active_bonus.is_used = True # Товар забирается
 
+    if request.delivery_type == "paid":
+        base_total += settings.paid_delivery_price
+
     final_total = max(Decimal("0.00"), base_total)
 
     # --- Списание с баланса (если есть деньги) ---
@@ -98,6 +101,8 @@ async def create_order(
         promo_code_used=request.promo_code if promo else None,
         address=request.address,
         delivery_type=request.delivery_type,
+        delivery_date=request.delivery_date,
+        delivery_time=request.delivery_time,
         customer_name=request.client_name,
         customer_phone=request.client_phone,
         customer_tg_username=request.tg_username,
@@ -141,12 +146,19 @@ async def create_order(
                 items_text=items_text, 
                 total_price=float(final_total),
                 paid_from_balance=float(paid_from_balance),
-                promo_code_used=request.promo_code if promo else None
+                promo_code_used=request.promo_code if promo else None,
+                delivery_date=request.delivery_date,
+                delivery_time=request.delivery_time
             )
         except Exception:
             pass # Не сбрасываем заказ, если бот заблокирован
         
     return {"status": "success", "order_id": new_order.id}
+
+@router.get("/delivery-times", response_model=List[DeliveryTimeResponse])
+async def get_delivery_times(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(DeliveryTime).where(DeliveryTime.is_active == True))
+    return result.scalars().all()
 
 @router.get("/my", response_model=List[OrderResponse])
 async def get_my_orders(

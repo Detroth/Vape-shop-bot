@@ -1,5 +1,6 @@
 # core/config.py
 from typing import Optional
+from decimal import Decimal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, AliasChoices
 
@@ -20,6 +21,8 @@ class Settings(BaseSettings):
     admin_username: str = Field("admin", description="Логин админ-панели")
     admin_password: str = Field("admin", description="Пароль админ-панели")
     admin_secret_key: str = Field("secret", description="Секретный ключ для куки сессий")
+    
+    paid_delivery_price: Decimal = Field(default=Decimal("10.00"), description="Стоимость платной доставки")
     
     # YooKassa
     yookassa_shop_id: Optional[str] = Field(default=None, description="Shop ID в ЮKassa")

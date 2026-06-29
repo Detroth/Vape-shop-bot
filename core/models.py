@@ -85,6 +85,8 @@ class Order(Base):
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     
     delivery_type: Mapped[str] = mapped_column(String(20), default="delivery")
+    delivery_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
+    delivery_time: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
     customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     customer_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     customer_tg_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -156,3 +158,10 @@ class UserBonus(Base):
 
     user: Mapped["User"] = relationship(lazy="selectin")
 
+
+class DeliveryTime(Base):
+    __tablename__ = "delivery_times"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    time_slot: Mapped[str] = mapped_column(String(50))
+    is_active: Mapped[bool] = mapped_column(default=True)

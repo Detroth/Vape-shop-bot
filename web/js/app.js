@@ -1129,6 +1129,70 @@ async function submitDeposit() {
 
 // --- ЛОГИКА ФОРМЫ ОФОРМЛЕНИЯ ЗАКАЗА ---
 let checkoutDeliveryType = 'delivery';
+let selectedDeliveryDate = null;
+let selectedDeliveryTime = null;
+let availableDeliveryTimes = [];
+
+async function loadDeliveryTimes() {
+    try {
+        const res = await apiFetch('/api/orders/delivery-times');
+        if (res.ok) {
+            availableDeliveryTimes = await res.json();
+            renderDeliveryTimes();
+        }
+    } catch (e) { console.error("Ошибка загрузки времени"); }
+}
+
+function renderDeliveryDates() {
+    const container = document.getElementById('checkout-dates');
+    if (!container) return;
+    let html = '';
+    const today = new Date();
+    for(let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const dateStr = d.toLocaleDateString('ru-RU');
+        const dayName = d.toLocaleDateString('ru-RU', { weekday: 'short' });
+        const shortDate = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+        
+        if (i === 0 && !selectedDeliveryDate) selectedDeliveryDate = dateStr;
+        const isSelected = selectedDeliveryDate === dateStr;
+        const btnClass = isSelected ? 'bg-app-accent text-white border-app-accent' : 'bg-app-card text-app-muted border-white/5';
+        html += `<button onclick="selectDeliveryDate('${dateStr}')" class="flex flex-col items-center justify-center min-w-[70px] py-2 rounded-xl border ${btnClass} transition-colors"><span class="text-[10px] uppercase mb-1">${dayName}</span><span class="text-sm font-bold">${shortDate}</span></button>`;
+    }
+    container.innerHTML = html;
+    validateCheckoutForm();
+}
+
+function selectDeliveryDate(dateStr) {
+    selectedDeliveryDate = dateStr;
+    tg.HapticFeedback.selectionChanged();
+    renderDeliveryDates();
+}
+
+function renderDeliveryTimes() {
+    const container = document.getElementById('checkout-times');
+    if (!container) return;
+    if (availableDeliveryTimes.length === 0) {
+        container.innerHTML = '<div class="text-xs text-app-muted py-2">Слоты времени недоступны</div>';
+        return;
+    }
+    let html = '';
+    availableDeliveryTimes.forEach((t, i) => {
+        if (!selectedDeliveryTime && i === 0) selectedDeliveryTime = t.time_slot;
+        const isSelected = selectedDeliveryTime === t.time_slot;
+        const btnClass = isSelected ? 'bg-app-accent text-white border-app-accent' : 'bg-app-card text-app-muted border-white/5';
+        html += `<button onclick="selectDeliveryTime('${t.time_slot}')" class="px-4 py-2.5 rounded-xl whitespace-nowrap text-sm font-bold border ${btnClass} transition-colors">${t.time_slot}</button>`;
+    });
+    container.innerHTML = html;
+    validateCheckoutForm();
+}
+
+function selectDeliveryTime(timeStr) {
+    selectedDeliveryTime = timeStr;
+    tg.HapticFeedback.selectionChanged();
+    renderDeliveryTimes();
+}
 
 function openCheckoutScreen() {
     // --- ПРОВЕРКА ОСТАТКОВ ПЕРЕД ОФОРМЛЕНИЕМ ---
@@ -1158,6 +1222,9 @@ function openCheckoutScreen() {
     document.getElementById('checkout-screen').classList.remove('hidden');
     tg.BackButton.show();
     tg.BackButton.onClick(closeCheckoutScreen);
+    
+    loadDeliveryTimes();
+    renderDeliveryDates();
 }
 
 function closeCheckoutScreen() {
@@ -1169,16 +1236,23 @@ function setCheckoutDeliveryType(type) {
     checkoutDeliveryType = type;
     const delBtn = document.getElementById('btn-type-delivery');
     const pickBtn = document.getElementById('btn-type-pickup');
+    const paidBtn = document.getElementById('btn-type-paid');
     const addrWrap = document.getElementById('wrapper-checkout-address');
+    const dtWrap = document.getElementById('wrapper-checkout-datetime');
+
+    if(delBtn) delBtn.className = type === 'delivery' ? 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent' : 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
+    if(pickBtn) pickBtn.className = type === 'pickup' ? 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent' : 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
+    if(paidBtn) paidBtn.className = type === 'paid' ? 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent' : 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
 
     if(type === 'delivery') {
-        delBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent';
-        pickBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
-        addrWrap.classList.remove('hidden');
+        if(addrWrap) addrWrap.classList.remove('hidden');
+        if(dtWrap) dtWrap.classList.add('hidden');
+    } else if (type === 'paid') {
+        if(addrWrap) addrWrap.classList.remove('hidden');
+        if(dtWrap) dtWrap.classList.remove('hidden');
     } else {
-        pickBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent';
-        delBtn.className = 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
-        addrWrap.classList.add('hidden');
+        if(addrWrap) addrWrap.classList.add('hidden');
+        if(dtWrap) dtWrap.classList.add('hidden');
     }
     validateCheckoutForm();
 }
@@ -1190,7 +1264,8 @@ function validateCheckoutForm() {
     const btn = document.getElementById('submit-checkout-btn');
 
     let isValid = name.length >= 2 && phone.length >= 5;
-    if (checkoutDeliveryType === 'delivery' && address.length < 5) isValid = false;
+    if ((checkoutDeliveryType === 'delivery' || checkoutDeliveryType === 'paid') && address.length < 5) isValid = false;
+    if (checkoutDeliveryType === 'paid' && (!selectedDeliveryDate || !selectedDeliveryTime)) isValid = false;
 
     if (isValid) {
         btn.disabled = false;
@@ -1213,9 +1288,11 @@ async function submitCheckoutForm() {
         promo_code: appState.promoCode,
         activated_bonus_id: appState.activeBonus ? appState.activeBonus.id : null,
         delivery_type: checkoutDeliveryType,
+        delivery_date: checkoutDeliveryType === 'paid' ? selectedDeliveryDate : null,
+        delivery_time: checkoutDeliveryType === 'paid' ? selectedDeliveryTime : null,
         client_name: document.getElementById('checkout-name').value.trim(),
         client_phone: document.getElementById('checkout-phone').value.trim(),
-        address: checkoutDeliveryType === 'delivery' ? document.getElementById('checkout-address').value.trim() : null,
+        address: (checkoutDeliveryType === 'delivery' || checkoutDeliveryType === 'paid') ? document.getElementById('checkout-address').value.trim() : null,
         comment: document.getElementById('checkout-comment').value.trim(),
         tg_username: document.getElementById('checkout-tg').value.trim()
     };

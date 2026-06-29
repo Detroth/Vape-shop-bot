@@ -27,14 +27,24 @@ async def cmd_admin(message: Message):
 async def notify_new_order(
     bot: Bot, admin_chat_id: int, order_id: int, client_name: str, client_phone: str, 
     tg_username: str, delivery_type: str, address: str, comment: str, items_text: str, 
-    total_price: float, paid_from_balance: float = 0.0, promo_code_used: str = None
+    total_price: float, paid_from_balance: float = 0.0, promo_code_used: str = None,
+    delivery_date: str = None, delivery_time: str = None
 ):
     """Отправляет уведомление о новом заказе в рабочий чат."""
-    delivery_str = "Доставка" if delivery_type == "delivery" else "Самовывоз"
+    if delivery_type == "delivery":
+        delivery_str = "Доставка"
+    elif delivery_type == "paid":
+        delivery_str = "Платная доставка"
+    else:
+        delivery_str = "Самовывоз"
+        
     addr_str = address if address else "Самовывоз"
     comment_str = comment if comment else "Нет"
     promo_str = f" (Применен код: {promo_code_used})" if promo_code_used else ""
     tg_username_str = tg_username if tg_username else "скрыт"
+    
+    date_str = f"📅 <b>Дата:</b> {delivery_date}\n" if delivery_date else ""
+    time_str = f"⏰ <b>Время:</b> {delivery_time}\n" if delivery_time else ""
 
     status_text = "✅ Оплачен (с баланса)" if total_price - paid_from_balance <= 0 else "⏳ Ожидает оплаты"
     balance_str = f"\n💳 <b>Списано с баланса:</b> {paid_from_balance:.2f} Br" if paid_from_balance > 0 else ""
@@ -48,6 +58,7 @@ async def notify_new_order(
         f"✈️ <b>Telegram:</b> @{tg_username_str}\n\n"
         f"⚙️ <b>Тип:</b> {delivery_str}\n"
         f"📍 <b>Адрес:</b> {addr_str}\n"
+        f"{date_str}{time_str}"
         f"💬 <b>Комментарий:</b> {comment_str}\n"
         f"---------------------------------\n"
         f"🛒 <b>Товары:</b>\n"
