@@ -6,7 +6,7 @@ from sqlalchemy import select
 from pydantic import BaseModel
 
 from core.database import get_db
-from core.models import Promocode, DiscountType, Product, User
+from core.models import Promocode, DiscountType, Product, User, UserBonus, PrizeType
 from api.dependencies import verify_telegram_webapp_data
 from api.schemas import CartValidateRequest
 
@@ -81,6 +81,25 @@ async def validate_cart(
                 
             discount_amount += promo_discount
             current_total -= promo_discount
+
+    # Проверяем и применяем бонус
+    if request.activated_bonus_id:
+        bonus_result = await db.execute(
+            select(UserBonus).where(
+                UserBonus.id == request.activated_bonus_id, 
+                UserBonus.user_id == user_data["id"], 
+                UserBonus.is_used == False
+            )
+        )
+        bonus = bonus_result.scalar_one_or_none()
+        
+        if bonus and bonus.prize_type == PrizeType.DISCOUNT:
+            # Считаем, что value скидки это проценты
+            bonus_discount = current_total * (bonus.value / Decimal("100"))
+            if bonus_discount > current_total:
+                bonus_discount = current_total
+            discount_amount += bonus_discount
+            current_total -= bonus_discount
 
     final_total = max(Decimal("0.00"), current_total)
     

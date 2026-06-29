@@ -31,7 +31,8 @@ const appState = {
     promoCode: null,
     searchResults: null,
     sortBy: 'default',
-    filterInStock: false
+    filterInStock: false,
+    activeBonus: null
 };
 
 // Строгое получение реальных данных авторизации от Telegram (никаких заглушек)
@@ -834,6 +835,16 @@ function updateCartTotalsDOM() {
             if (discVal) discVal.textContent = `-${formatPrice(discount)} Br`;
         } else if (discRow) {
             discRow.classList.add('hidden');
+    }
+    
+    if (appState.activeBonus && appState.activeBonus.type === 'discount') {
+        // Мы просто показываем строчку, а валидация на беке вычтет скидку
+        if (discRow) {
+            discRow.classList.remove('hidden');
+            if (discLabel) discLabel.textContent = 'Бонусная скидка';
+            // Пока не получим ответ от validate_cart, мы не знаем точную сумму скидки,
+            // поэтому покажем просто процент, если он есть в activeBonus.value
+            if (discVal) discVal.textContent = `-${appState.activeBonus.value}%`;
         }
     }
 }
@@ -846,7 +857,8 @@ async function renderCart() {
     itemsContainer.innerHTML = '';
     const cartKeys = Object.keys(appState.cart);
     
-    if (cartKeys.length === 0) {
+    // Если корзина пуста и нет бонусного товара
+    if (cartKeys.length === 0 && !(appState.activeBonus && appState.activeBonus.type === 'product')) {
         emptyState.classList.remove('hidden');
         receipt.classList.add('hidden');
         return;
@@ -904,6 +916,27 @@ async function renderCart() {
             </div>`;
     });
     
+    // Добавляем бонусный товар, если он есть
+    if (appState.activeBonus && appState.activeBonus.type === 'product') {
+        html += `
+            <div class="bg-app-card p-3 rounded-2xl flex gap-3 border border-app-accent/50">
+                <div class="w-20 h-20 bg-app-bg rounded-xl flex items-center justify-center shrink-0">
+                    <span class="text-2xl">🎁</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="font-bold text-sm truncate text-app-accent">${appState.activeBonus.name} (Бонус)</div>
+                        <div class="font-bold whitespace-nowrap text-green-400">0 Br</div>
+                    </div>
+                    <div class="text-xs text-app-muted mt-1">Бесплатно</div>
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="text-xs font-semibold px-2 py-1 bg-app-bg rounded-lg">1 шт.</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
     itemsContainer.innerHTML = html;
 
     updateCartTotalsDOM();
@@ -929,7 +962,7 @@ async function validateCartOnBackend() {
         const res = await apiFetch('/api/cart/validate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items, promo_code: appState.promoCode })
+            body: JSON.stringify({ items, promo_code: appState.promoCode, activated_bonus_id: appState.activeBonus ? appState.activeBonus.id : null })
         });
         if (res.ok) {
             const data = await res.json();
@@ -1033,7 +1066,7 @@ async function applyPromo() {
         }
     } catch (e) {
         errEl.textContent = "Ошибка проверки промокода";
-        errEl.classList.remove('hidden');
+        errEl.classList.add('hidden');
     } finally {
         btn.disabled = false;
         btn.textContent = originalText;
@@ -1177,6 +1210,7 @@ async function submitCheckoutForm() {
     const payload = {
         items: items,
         promo_code: appState.promoCode,
+        activated_bonus_id: appState.activeBonus ? appState.activeBonus.id : null,
         delivery_type: checkoutDeliveryType,
         client_name: document.getElementById('checkout-name').value.trim(),
         client_phone: document.getElementById('checkout-phone').value.trim(),
@@ -1195,9 +1229,12 @@ async function submitCheckoutForm() {
             tg.showPopup({ title: "Успешно!", message: "Ваш заказ оформлен. Менеджер свяжется с вами.", buttons: [{text: "OK"}]});
             appState.cart = {};
             appState.promoCode = null;
+            appState.activeBonus = null; // сбрасываем бонус после заказа
             saveCart();
+            renderCart();
             
             await loadUserProfile(); // Легкое обновление профиля, чтобы подтянуть списанный баланс
+            refreshActiveTabProducts();
             
             // Перекидываем пользователя на экран Профиля и сразу открываем Историю заказов
             closeCheckoutScreen();
@@ -1252,6 +1289,77 @@ function removeFavorite(productId) {
     }
 }
 
+// --- ЛОГИКА ИНВЕНТАРЯ БОНУСОВ ---
+async function openBonusesScreen() {
+    document.getElementById('bonuses-screen').classList.remove('hidden');
+    tg.BackButton.show();
+    tg.BackButton.onClick(closeBonusesScreen);
+    
+    const list = document.getElementById('bonuses-list');
+    list.innerHTML = `<div class="text-center text-app-muted mt-10">Загрузка...</div>`;
+    
+    try {
+        const res = await apiFetch('/api/user/bonuses');
+        if (res.ok) {
+            const bonuses = await res.json();
+            if (bonuses.length === 0) {
+                list.innerHTML = `<div class="text-center text-app-muted mt-10">У вас пока нет бонусов</div>`;
+            } else {
+                list.innerHTML = bonuses.map(b => `
+                    <div class="bg-app-card p-4 rounded-xl border border-white/5 flex justify-between items-center">
+                        <div>
+                            <div class="font-bold text-lg">${b.prize_name}</div>
+                            <div class="text-xs text-app-muted mt-1">Добавлен: ${new Date(b.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <button onclick="activateBonus(${b.id})" class="bg-app-bg text-app-accent px-4 py-2 rounded-xl text-sm font-bold border border-app-accent hover:bg-app-accent hover:text-white transition-colors">
+                            Активировать
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch (e) {
+        list.innerHTML = `<div class="text-center text-red-400 mt-10">Ошибка загрузки</div>`;
+    }
+}
+
+async function activateBonus(bonusId) {
+    tg.HapticFeedback.impactOccurred('medium');
+    try {
+        const res = await apiFetch(`/api/user/bonuses/${bonusId}/activate`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            if (data.status === 'applied_to_balance') {
+                tg.showAlert(data.message);
+                await loadUserProfile(); // обновляем профиль
+                openBonusesScreen(); // перезагружаем список
+            } else if (data.status === 'ready_for_order') {
+                appState.activeBonus = {
+                    id: bonusId,
+                    type: data.prize_type,
+                    name: data.prize_name,
+                    value: data.value
+                };
+                tg.showAlert(`Бонус "${data.prize_name}" применен к вашей корзине! Оформите заказ, чтобы воспользоваться им.`);
+                closeBonusesScreen();
+                openCart();
+            }
+        } else {
+            tg.showAlert(`Ошибка: ${data.detail || 'Не удалось активировать'}`);
+        }
+    } catch (e) {
+        tg.showAlert('Ошибка соединения');
+    }
+}
+
+function closeBonusesScreen() {
+    document.getElementById('bonuses-screen').classList.add('hidden');
+    tg.BackButton.hide();
+}
+
 // --- ЛОГИКА КОЛЕСА ФОРТУНЫ ---
 let currentFortuneRotation = 0;
 let isSpinning = false;
@@ -1272,6 +1380,23 @@ async function openFortuneScreen() {
         const res = await apiFetch('/api/fortune/status');
         if (res.ok) {
             const data = await res.json();
+            
+            // Отрисовка текста призов на колесе
+            const sectorsContainer = document.getElementById('fortune-wheel-sectors');
+            if (data.prizes && data.prizes.length > 0) {
+                sectorsContainer.innerHTML = '';
+                const numSectors = 8;
+                for (let i = 0; i < numSectors; i++) {
+                    const prizeIndex = i % data.prizes.length;
+                    const angle = i * (360 / numSectors) + (360 / numSectors / 2);
+                    sectorsContainer.innerHTML += `
+                        <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-[10px] text-center px-2" style="transform: rotate(${angle}deg);">
+                            ${data.prizes[prizeIndex].name}
+                        </div>
+                    `;
+                }
+            }
+
             if (data.can_spin) {
                 btn.disabled = false;
                 btn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1328,7 +1453,11 @@ async function spinFortune() {
             setTimeout(async () => {
                 isSpinning = false;
                 statusText.innerText = "Следующая попытка через 24 часа";
-                tg.showAlert(`🎉 Поздравляем! Ваш выигрыш: ${data.name}! Бонусы зачислены в ваш профиль.`);
+                if (data.prize_type !== 'none') {
+                    tg.showAlert(`🎉 Поздравляем! Ваш выигрыш: ${data.name}!\n\nПриз добавлен в раздел "Бонусы".`);
+                } else {
+                    tg.showAlert(`К сожалению, вы ничего не выиграли.\n\nПопробуйте завтра!`);
+                }
                 
                 // Обновляем профиль (баланс, бонусы)
                 await loadUserProfile();

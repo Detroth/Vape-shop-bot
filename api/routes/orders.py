@@ -8,7 +8,7 @@ from aiogram import Bot
 
 from core.config import settings
 from core.database import get_db
-from core.models import Order, OrderItem, OrderStatus, Product, User, Promocode, DiscountType
+from core.models import Order, OrderItem, OrderStatus, Product, User, Promocode, DiscountType, UserBonus, PrizeType
 from api.dependencies import verify_telegram_webapp_data
 from bot.handlers.admin import notify_new_order
 from api.schemas import OrderCreateRequest, OrderResponse
@@ -64,6 +64,23 @@ async def create_order(
         else:
             raise HTTPException(status_code=400, detail="Промокод не существует или его лимит исчерпан")
 
+    active_bonus = None
+    if request.activated_bonus_id:
+        bonus_result = await db.execute(
+            select(UserBonus).where(
+                UserBonus.id == request.activated_bonus_id, 
+                UserBonus.user_id == telegram_id, 
+                UserBonus.is_used == False
+            )
+        )
+        active_bonus = bonus_result.scalar_one_or_none()
+        if active_bonus:
+            if active_bonus.prize_type == PrizeType.DISCOUNT:
+                base_total -= base_total * (active_bonus.value / Decimal("100"))
+                active_bonus.is_used = True # Скидка сгорает
+            elif active_bonus.prize_type == PrizeType.PRODUCT:
+                active_bonus.is_used = True # Товар забирается
+
     final_total = max(Decimal("0.00"), base_total)
 
     # --- Списание с баланса (если есть деньги) ---
@@ -102,6 +119,9 @@ async def create_order(
         ))
         variant_text = f" [{item.variant}]" if item.variant else ""
         items_text_lines.append(f"- {product_obj.name}{variant_text} ({item.quantity} шт.)")
+        
+    if active_bonus and active_bonus.prize_type == PrizeType.PRODUCT:
+        items_text_lines.append(f"🎁 БОНУС: {active_bonus.prize_name} (Бесплатно)")
         
     await db.commit()
     

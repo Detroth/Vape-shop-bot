@@ -27,6 +27,8 @@ class PrizeType(str, enum.Enum):
     BONUS = "bonus"
     DISCOUNT = "discount"
     PROMOCODE = "promocode"
+    PRODUCT = "product"
+    NONE = "none"
 
 # --- Модели ---
 
@@ -138,6 +140,19 @@ class FortuneHistory(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"))
     spun_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+
+class UserBonus(Base):
+    __tablename__ = "user_bonuses"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"))
+    prize_name: Mapped[str] = mapped_column(String(255))
+    prize_type: Mapped[PrizeType] = mapped_column(SQLEnum(PrizeType, native_enum=False))
+    value: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    is_used: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(lazy="selectin")
 

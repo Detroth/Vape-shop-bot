@@ -16,7 +16,7 @@ from datetime import datetime
 # Чтобы поиск работал корректно, мы глобально переопределяем поведение like на ilike для строк:
 String.Comparator.like = String.Comparator.ilike
 
-from core.models import User, Category, Product, Order, Promocode, FortunePrize
+from core.models import User, Category, Product, Order, Promocode, FortunePrize, UserBonus
 from core.config import settings
 from core.database import engine
 
@@ -94,6 +94,14 @@ class FortunePrizeAdmin(admin.ModelAdmin):
     label = "Призы Фортуны"
     model = FortunePrize
     search_fields = [FortunePrize.name]
+
+@site.register_admin
+class UserBonusAdmin(admin.ModelAdmin):
+    page_schema = "Инвентарь бонусов"
+    label = "Инвентарь бонусов"
+    model = UserBonus
+    search_fields = [UserBonus.prize_name]
+    list_filter = [UserBonus.user_id, UserBonus.is_used, UserBonus.prize_type]
 
 @site.register_admin
 class UserAdmin(admin.ModelAdmin):

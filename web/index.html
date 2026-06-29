@@ -81,7 +81,7 @@
             </div>
 
             <!-- Сетка товаров (рендерится динамически) -->
-            <div id="products-grid" class="grid grid-cols-2 gap-3 pb-6">
+            <div id="products-grid" class="grid grid-cols-2 gap-3 pb-[100px]">
                 <!-- Карточки вставляются через JS -->
             </div>
         </div>
@@ -167,10 +167,10 @@
                 <div class="bg-app-card border border-white/5 rounded-2xl p-3 text-center"><div class="text-[10px] text-app-muted uppercase font-semibold mb-1">Скидка</div><div class="font-bold text-green-400" id="profile-discount">0%</div></div>
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 pb-[100px]">
                 <button onclick="fetchOrders()" class="w-full bg-app-card p-4 rounded-xl text-left font-medium active:bg-app-bg transition-colors flex justify-between items-center border border-white/5">Мои заказы <svg class="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
                 <button class="w-full bg-app-card p-4 rounded-xl text-left font-medium active:bg-app-bg transition-colors flex justify-between items-center border border-white/5">Депозиты <svg class="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
-                <button class="w-full bg-app-card p-4 rounded-xl text-left font-medium active:bg-app-bg transition-colors flex justify-between items-center border border-white/5">Бонусы <svg class="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
+                <button onclick="openBonusesScreen()" class="w-full bg-app-card p-4 rounded-xl text-left font-medium active:bg-app-bg transition-colors flex justify-between items-center border border-white/5">Бонусы <svg class="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
                 <button onclick="openDepositModal()" class="w-full bg-app-card p-4 rounded-xl text-left font-medium active:bg-app-bg transition-colors flex justify-between items-center border border-white/5 text-app-accent">Пополнить счет <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
                 <button onclick="openFortuneScreen()" class="w-full bg-app-card p-4 rounded-xl text-left font-medium active:bg-app-bg transition-colors flex justify-between items-center border border-white/5 mt-4 text-white">🎰 Колесо Фортуны <svg class="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
                 <button onclick="openSupport()" class="w-full bg-app-card p-4 rounded-xl text-left font-medium active:bg-app-bg transition-colors flex justify-between items-center border border-white/5 mt-4">Поддержка <svg class="w-4 h-4 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg></button>
@@ -317,6 +317,21 @@
         </div>
     </div>
 
+    <!-- Экран: Мои Бонусы (Инвентарь) -->
+    <div id="bonuses-screen" class="fixed inset-0 bg-app-bg z-50 flex flex-col hidden transition-opacity">
+        <div class="flex-1 overflow-y-auto pb-[90px] p-4">
+            <div class="flex items-center mb-6 mt-2">
+                <button onclick="closeBonusesScreen()" class="bg-app-card p-2 rounded-xl text-white border border-white/5 mr-4 hover:bg-white/5 transition-colors">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                </button>
+                <h2 class="text-2xl font-bold">Мои Бонусы</h2>
+            </div>
+            <div id="bonuses-list" class="space-y-4">
+                <!-- Бонусы рендерятся тут -->
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно: Пополнение счета -->
     <div id="deposit-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4 opacity-0 transition-opacity">
         <div class="bg-app-card w-full max-w-sm rounded-2xl p-5 border border-white/10 shadow-2xl transform scale-95 transition-transform" id="deposit-modal-content">
@@ -401,15 +416,8 @@
                         #3b82f6 315deg 360deg
                     );">
                         <!-- Текст секторов -->
-                        <div class="absolute inset-0 flex items-center justify-center text-white">
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(22.5deg);">Приз</div>
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(67.5deg);">Приз</div>
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(112.5deg);">Приз</div>
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(157.5deg);">Приз</div>
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(202.5deg);">Приз</div>
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(247.5deg);">Приз</div>
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(292.5deg);">Приз</div>
-                            <div class="absolute w-full h-full flex justify-center items-start pt-4 font-bold text-xs" style="transform: rotate(337.5deg);">Приз</div>
+                        <div id="fortune-wheel-sectors" class="absolute inset-0 flex items-center justify-center text-white">
+                            <!-- Заполняется динамически из JS -->
                         </div>
                     </div>
                 </div>

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from core.database import get_db
-from core.models import User, FortunePrize, FortuneHistory, PrizeType
+from core.models import User, FortunePrize, FortuneHistory, PrizeType, UserBonus
 from api.dependencies import get_current_user
 
 router = APIRouter(prefix="/fortune", tags=["Fortune"])
@@ -37,9 +37,16 @@ async def get_fortune_status(
         time_since_spin = now - spun_at_utc
         if time_since_spin < timedelta(hours=24):
             time_left = timedelta(hours=24) - time_since_spin
-            return {"can_spin": False, "time_left_seconds": int(time_left.total_seconds())}
+            
+            prizes_result = await db.execute(select(FortunePrize))
+            all_prizes = [{"id": p.id, "name": p.name, "prize_type": p.prize_type.value} for p in prizes_result.scalars().all()]
+            
+            return {"can_spin": False, "time_left_seconds": int(time_left.total_seconds()), "prizes": all_prizes}
 
-    return {"can_spin": True}
+    prizes_result = await db.execute(select(FortunePrize))
+    all_prizes = [{"id": p.id, "name": p.name, "prize_type": p.prize_type.value} for p in prizes_result.scalars().all()]
+
+    return {"can_spin": True, "prizes": all_prizes}
 
 
 @router.post("/spin")
@@ -77,19 +84,18 @@ async def spin_fortune(
 
     # 3. Случайный выбор с учетом шанса
     weights = [prize.chance for prize in prizes]
-    # random.choices возвращает список из k элементов, берем первый
     chosen_prize = random.choices(prizes, weights=weights, k=1)[0]
 
-    # 4. Обновление пользователя в зависимости от типа приза
-    if chosen_prize.prize_type == PrizeType.BONUS:
-        current_user.bonus_points += int(chosen_prize.value)
-    elif chosen_prize.prize_type == PrizeType.DISCOUNT:
-        # Увеличиваем персональную скидку пользователя
-        current_user.personal_discount += int(chosen_prize.value)
-    elif chosen_prize.prize_type == PrizeType.PROMOCODE:
-        # Логика выдачи промокода может быть просто информационной
-        # Пользователь увидит название (код) на фронтенде
-        pass
+    # 4. Сохранение приза в инвентарь пользователя (UserBonus), если это не пустышка
+    if chosen_prize.prize_type != PrizeType.NONE:
+        new_bonus = UserBonus(
+            user_id=current_user.telegram_id,
+            prize_name=chosen_prize.name,
+            prize_type=chosen_prize.prize_type,
+            value=chosen_prize.value,
+            is_used=False
+        )
+        db.add(new_bonus)
 
     # 5. Запись факта кручения в историю
     new_history = FortuneHistory(user_id=current_user.telegram_id)

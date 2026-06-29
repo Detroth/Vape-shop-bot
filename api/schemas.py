@@ -35,10 +35,12 @@ class CartItemSchema(BaseModel):
 class CartValidateRequest(BaseModel):
     items: List[CartItemSchema]
     promo_code: Optional[str] = None
+    activated_bonus_id: Optional[int] = None
 
 class OrderCreateRequest(BaseModel):
     items: List[CartItemSchema]
     promo_code: Optional[str] = None
+    activated_bonus_id: Optional[int] = None
     delivery_type: str = "delivery"
     client_name: str
     client_phone: str
