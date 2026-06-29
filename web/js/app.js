@@ -1252,6 +1252,105 @@ function removeFavorite(productId) {
     }
 }
 
+// --- ЛОГИКА КОЛЕСА ФОРТУНЫ ---
+let currentFortuneRotation = 0;
+let isSpinning = false;
+
+async function openFortuneScreen() {
+    document.getElementById('fortune-screen').classList.remove('hidden');
+    tg.BackButton.show();
+    tg.BackButton.onClick(closeFortuneScreen);
+
+    const btn = document.getElementById('btn-spin-fortune');
+    const statusText = document.getElementById('fortune-status-text');
+    
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    statusText.innerText = "Проверка статуса...";
+
+    try {
+        const res = await apiFetch('/api/fortune/status');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.can_spin) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                statusText.innerText = "Вы можете крутить колесо!";
+            } else {
+                const hours = Math.floor(data.time_left_seconds / 3600);
+                const minutes = Math.floor((data.time_left_seconds % 3600) / 60);
+                statusText.innerText = `Следующая попытка через ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            }
+        } else {
+            statusText.innerText = "Ошибка загрузки статуса";
+        }
+    } catch (e) {
+        statusText.innerText = "Ошибка сети";
+    }
+}
+
+function closeFortuneScreen() {
+    if (isSpinning) return;
+    document.getElementById('fortune-screen').classList.add('hidden');
+    
+    // Возвращаем кнопку "назад" для профиля, если нужно, или скрываем
+    // В данном приложении Profile — это вкладка, там обычно нет кнопки "назад"
+    tg.BackButton.hide();
+}
+
+async function spinFortune() {
+    if (isSpinning) return;
+    
+    const btn = document.getElementById('btn-spin-fortune');
+    const statusText = document.getElementById('fortune-status-text');
+    
+    isSpinning = true;
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    statusText.innerText = "Крутим колесо...";
+
+    try {
+        const res = await apiFetch('/api/fortune/spin', { method: 'POST' });
+        if (res.ok) {
+            const data = await res.json();
+            
+            // Расчет угла. 8 секторов по 45 градусов.
+            // Допустим, мы просто крутим случайный сектор на фронте, потому что на бэке не знаем карту колеса (и не нужно)
+            const sectorAngle = Math.floor(Math.random() * 8) * 45;
+            const extraRotation = 3600 + sectorAngle + (Math.random() * 20 - 10); // 10 полных оборотов + сектор + случайное отклонение
+            
+            currentFortuneRotation += extraRotation;
+            
+            const wheel = document.getElementById('fortune-wheel');
+            wheel.style.transform = `rotate(${currentFortuneRotation}deg)`;
+            
+            // Ждем 4 секунды (время CSS transition)
+            setTimeout(async () => {
+                isSpinning = false;
+                statusText.innerText = "Следующая попытка через 24 часа";
+                tg.showAlert(`🎉 Поздравляем! Ваш выигрыш: ${data.name}! Бонусы зачислены в ваш профиль.`);
+                
+                // Обновляем профиль (баланс, бонусы)
+                await loadUserProfile();
+            }, 4000);
+            
+        } else {
+            const error = await res.json();
+            tg.showAlert(error.detail || "Ошибка");
+            isSpinning = false;
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            statusText.innerText = "Попробуйте снова";
+        }
+    } catch (e) {
+        tg.showAlert("Ошибка сети");
+        isSpinning = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        statusText.innerText = "Попробуйте снова";
+    }
+}
+
 // --- ЛОГИКА КНОПКИ ПОДДЕРЖКИ ---
 async function openSupport() {
     try {

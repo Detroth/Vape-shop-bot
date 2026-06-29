@@ -23,6 +23,11 @@ class DiscountType(str, enum.Enum):
     FIXED = "fixed"
     PERCENTAGE = "percentage"
 
+class PrizeType(str, enum.Enum):
+    BONUS = "bonus"
+    DISCOUNT = "discount"
+    PROMOCODE = "promocode"
+
 # --- Модели ---
 
 class User(Base):
@@ -115,3 +120,24 @@ class Promocode(Base):
     value: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     max_uses: Mapped[int] = mapped_column(Integer, default=1)
     current_uses: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class FortunePrize(Base):
+    __tablename__ = "fortune_prizes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255))
+    prize_type: Mapped[PrizeType] = mapped_column(SQLEnum(PrizeType, native_enum=False))
+    value: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    chance: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class FortuneHistory(Base):
+    __tablename__ = "fortune_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"))
+    spun_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+

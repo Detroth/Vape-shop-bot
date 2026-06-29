@@ -16,7 +16,7 @@ class Base(DeclarativeBase):
 async def init_db():
     """Создает таблицы в базе данных при старте."""
     # Импорт внутри функции позволяет избежать циклических зависимостей
-    from core.models import User, Category, Product, Order, OrderItem, Promocode
+    from core.models import User, Category, Product, Order, OrderItem, Promocode, FortunePrize, FortuneHistory
     
     async with engine.begin() as conn:
         # Логируем зарегистрированные модели, чтобы убедиться, что они видны SQLAlchemy
@@ -26,7 +26,7 @@ async def init_db():
 async def setup_initial_database(session: AsyncSession):
     """Наполняет пустую БД начальными данными."""
     from sqlalchemy import select
-    from core.models import Category, Product, Promocode, DiscountType
+    from core.models import Category, Product, Promocode, DiscountType, FortunePrize, PrizeType
     
     # Проверяем, есть ли уже категории в БД
     result = await session.execute(select(Category).limit(1))
@@ -57,6 +57,18 @@ async def setup_initial_database(session: AsyncSession):
     session.add_all([promo1, promo2])
 
     await session.commit()
+
+    # Проверяем, есть ли уже призы в БД (чтобы можно было вызывать setup_initial_database и для них)
+    result_prizes = await session.execute(select(FortunePrize).limit(1))
+    if result_prizes.scalar_one_or_none() is None:
+        fortune_prizes = [
+            FortunePrize(name="50 бонусов", prize_type=PrizeType.BONUS, value=50, chance=30),
+            FortunePrize(name="100 бонусов", prize_type=PrizeType.BONUS, value=100, chance=10),
+            FortunePrize(name="Промокод FORTUNE10", prize_type=PrizeType.PROMOCODE, value=10, chance=5),
+            FortunePrize(name="Попробуй завтра", prize_type=PrizeType.BONUS, value=0, chance=55),
+        ]
+        session.add_all(fortune_prizes)
+        await session.commit()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Зависимость для получения асинхронной сессии БД."""
