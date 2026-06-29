@@ -42,6 +42,7 @@ class OrderCreateRequest(BaseModel):
     promo_code: Optional[str] = None
     activated_bonus_id: Optional[int] = None
     delivery_type: str = "delivery"
+    payment_method: str = "cash"
     delivery_date: Optional[str] = None
     delivery_time: Optional[str] = None
     client_name: str

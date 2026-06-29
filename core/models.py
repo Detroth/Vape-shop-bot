@@ -85,6 +85,7 @@ class Order(Base):
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     
     delivery_type: Mapped[str] = mapped_column(String(20), default="delivery")
+    payment_method: Mapped[str] = mapped_column(String(20), default="cash")
     delivery_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
     delivery_time: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default=None)
     customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

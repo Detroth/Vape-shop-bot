@@ -1129,6 +1129,7 @@ async function submitDeposit() {
 
 // --- ЛОГИКА ФОРМЫ ОФОРМЛЕНИЯ ЗАКАЗА ---
 let checkoutDeliveryType = 'delivery';
+let checkoutPaymentMethod = 'cash';
 let selectedDeliveryDate = null;
 let selectedDeliveryTime = null;
 let availableDeliveryTimes = [];
@@ -1271,6 +1272,17 @@ function setCheckoutDeliveryType(type) {
     validateCheckoutForm();
 }
 
+function setCheckoutPaymentMethod(method) {
+    checkoutPaymentMethod = method;
+    const cashBtn = document.getElementById('btn-pay-cash');
+    const cardBtn = document.getElementById('btn-pay-card');
+    
+    if (cashBtn) cashBtn.className = method === 'cash' ? 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent' : 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
+    if (cardBtn) cardBtn.className = method === 'card' ? 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors bg-app-accent text-white shadow-md border border-app-accent' : 'flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors text-app-muted hover:text-white bg-app-card border border-white/5';
+    
+    validateCheckoutForm();
+}
+
 function validateCheckoutForm() {
     const name = document.getElementById('checkout-name').value.trim();
     const phone = document.getElementById('checkout-phone').value.trim();
@@ -1302,6 +1314,7 @@ async function submitCheckoutForm() {
         promo_code: appState.promoCode,
         activated_bonus_id: appState.activeBonus ? appState.activeBonus.id : null,
         delivery_type: checkoutDeliveryType,
+        payment_method: checkoutPaymentMethod,
         delivery_date: checkoutDeliveryType === 'paid' ? selectedDeliveryDate : null,
         delivery_time: checkoutDeliveryType === 'paid' ? selectedDeliveryTime : null,
         client_name: document.getElementById('checkout-name').value.trim(),
