@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     mini_app_url: str = Field(..., description="URL Mini App")
     admin_chat_id: int = Field(default=0, description="ID чата группы")
     admin_main_id: int = Field(default=7034023953, description="ID основного админа")
-    bot_chat_id: Optional[int] = Field(default=1115714808, description="ID чата бота")
+    bot_chat_id: int = Field(default=1115714808, description="ID чата бота")
     
     database_url: str = Field(
         ..., 
