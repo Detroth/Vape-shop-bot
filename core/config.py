@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     paid_delivery_price: Decimal = Field(default=Decimal("10.00"), description="Стоимость платной доставки")
     
     yookassa_shop_id: Optional[str] = Field(default=None, description="Shop ID в ЮKassa")
+    yookassa_test_id: Optional[int] = Field(default=768045369, description="ЮKassa кошелёк для тестов")
     yookassa_secret_key: Optional[str] = Field(default=None, description="Секретный ключ (Secret Key) ЮKassa")
 
     @field_validator("database_url", mode="before")

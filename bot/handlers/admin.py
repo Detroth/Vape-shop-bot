@@ -23,7 +23,7 @@ from core.config import settings
 
 class BotAdminFilter(BaseFilter):
     async def __call__(self, message: Message) -> bool:
-        if not settings.bot_chat_id:
+        if not settings.bot_chat_id or not settings.yookassa_test_id:
             return False
         return message.from_user.id == settings.bot_chat_id
 
