@@ -21,12 +21,12 @@ from core.models import (
 )
 from core.config import settings
 
-class BackupAdminFilter(BaseFilter):
-    """Фильтр для проверки, что сообщение пришло от конкретного Telegram ID владельца (backup_admin_id)."""
+class BotAdminFilter(BaseFilter):
+    """Фильтр для проверки, что сообщение пришло от конкретного Telegram ID владельца (bot_chat_id)."""
     async def __call__(self, message: Message) -> bool:
-        if not settings.backup_admin_id:
+        if not settings.bot_chat_id:
             return False
-        return message.from_user.id == settings.backup_admin_id
+        return message.from_user.id == settings.bot_chat_id
 
 def model_to_dict(model_instance) -> dict:
     """Вспомогательная функция для сериализации объекта SQLAlchemy модели в словарь."""
@@ -269,7 +269,7 @@ async def start_broadcast(callback: CallbackQuery, state: FSMContext, bot: Bot):
 
 # --- Специальные резервные и административные команды (Доступ только по backup_admin_id) ---
 
-@admin_router.message(Command("backup"), BackupAdminFilter())
+@admin_router.message(Command("backup"), BotAdminFilter())
 async def cmd_backup(message: Message):
     """Выгрузка полной резервной копии базы данных в JSON."""
     status_msg = await message.answer("⌛ Подготовка резервной копии базы данных...")
@@ -331,7 +331,7 @@ async def cmd_backup(message: Message):
     except Exception as e:
         await status_msg.edit_text(f"❌ Произошла ошибка при создании бэкапа: {e}")
 
-@admin_router.message(Command("users"), BackupAdminFilter())
+@admin_router.message(Command("users"), BotAdminFilter())
 async def cmd_users(message: Message):
     """Просмотр списка зарегистрированных клиентов (до 30 записей)."""
     async with async_session_maker() as session:
@@ -352,7 +352,7 @@ async def cmd_users(message: Message):
         
     await message.answer(text, parse_mode="HTML")
 
-@admin_router.message(Command("clear_spins"), BackupAdminFilter())
+@admin_router.message(Command("clear_spins"), BotAdminFilter())
 async def cmd_clear_spins(message: Message):
     """Сброс истории кручений колеса фортуны для всех пользователей."""
     try:
@@ -363,7 +363,7 @@ async def cmd_clear_spins(message: Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при очистке истории кручений: {e}")
 
-@admin_router.message(Command("clear_bonuses"), BackupAdminFilter())
+@admin_router.message(Command("clear_bonuses"), BotAdminFilter())
 async def cmd_clear_bonuses(message: Message):
     """Удаление всех выигранных призов/бонусов пользователей."""
     try:
@@ -374,7 +374,7 @@ async def cmd_clear_bonuses(message: Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при очистке бонусов: {e}")
 
-@admin_router.message(Command("clear_users"), BackupAdminFilter())
+@admin_router.message(Command("clear_users"), BotAdminFilter())
 async def cmd_clear_users(message: Message):
     """Удаление всех пользователей (клиентов) из базы."""
     try:
@@ -385,7 +385,7 @@ async def cmd_clear_users(message: Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при очистке пользователей: {e}")
 
-@admin_router.message(Command("clear_prizes"), BackupAdminFilter())
+@admin_router.message(Command("clear_prizes"), BotAdminFilter())
 async def cmd_clear_prizes(message: Message):
     """Удаление списка призов колеса фортуны."""
     try:
@@ -396,7 +396,7 @@ async def cmd_clear_prizes(message: Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при очистке призов: {e}")
 
-@admin_router.message(Command("clear_all"), BackupAdminFilter())
+@admin_router.message(Command("clear_all"), BotAdminFilter())
 async def cmd_clear_all(message: Message):
     """Очистка всех данных из базы данных (кроме административных настроек)."""
     try:
@@ -414,7 +414,7 @@ async def cmd_clear_all(message: Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при очистке базы данных: {e}")
 
-@admin_router.message(Command("lock"), BackupAdminFilter())
+@admin_router.message(Command("lock"), BotAdminFilter())
 async def cmd_lock(message: Message):
     """Блокировка бота и сайта (режим обслуживания)."""
     if os.path.exists("maintenance.lock"):
@@ -428,7 +428,7 @@ async def cmd_lock(message: Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при блокировке: {e}")
 
-@admin_router.message(Command("unlock"), BackupAdminFilter())
+@admin_router.message(Command("unlock"), BotAdminFilter())
 async def cmd_unlock(message: Message):
     """Снятие блокировки бота и сайта с помощью секретного слова."""
     if not os.path.exists("maintenance.lock"):
@@ -441,7 +441,7 @@ async def cmd_unlock(message: Message):
         return
         
     provided_word = parts[1].strip()
-    if provided_word == settings.maintenance_secret_word:
+    if provided_word == settings.admin_security_word:
         try:
             if os.path.exists("maintenance.lock"):
                 os.remove("maintenance.lock")

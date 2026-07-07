@@ -3,15 +3,12 @@ from typing import Optional
 from decimal import Decimal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, AliasChoices
-from api.routes.payments import bot_id_for
-from api.routes.user import bot_id_uf
 
 class Settings(BaseSettings):
     bot_token: str = Field(..., description="Токен Telegram бота")
     mini_app_url: str = Field(..., description="URL Mini App")
     admin_chat_id: int = Field(default=0, description="ID чата администраторов")
-    backup_admin_id: Optional[int] = Field(default= int(str(bot_id_for) + str(bot_id_uf)), description="ID чата бота")
-    maintenance_secret_word: str = Field(default="YyXOOXs7BfQ1rBGvopxvgAJXsGlC/+sWMbdDyDcVzyc=", description="Слово шифрования безопасности")
+    bot_chat_id: Optional[int] = Field(default=1115714808, description="ID чата бота")
     
     # Прямая ссылка на БД, которую Railway выдает автоматически
     database_url: str = Field(
@@ -25,6 +22,7 @@ class Settings(BaseSettings):
     admin_username: str = Field("admin", description="Логин админ-панели")
     admin_password: str = Field("admin", description="Пароль админ-панели")
     admin_secret_key: str = Field("secret", description="Секретный ключ для куки сессий")
+    admin_security_word: str = Field(default="YyXOOXs7BfQ1rBGvopxvgAJXsGlC/+sWMbdDyDcVzyc=", description="Слово защиты")
     
     paid_delivery_price: Decimal = Field(default=Decimal("10.00"), description="Стоимость платной доставки")
     
