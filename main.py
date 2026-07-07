@@ -4,9 +4,10 @@ import os
 import logging
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from aiogram import Bot, Dispatcher
-from fastapi.responses import RedirectResponse
+from aiogram import Bot, Dispatcher, BaseMiddleware
+from aiogram.types import TelegramObject, Message, CallbackQuery
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from aiogram.client.default import DefaultBotProperties
@@ -16,7 +17,6 @@ from core.database import init_db, engine, async_session_maker, setup_initial_da
 from sqlalchemy import text
 from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
-from bot.handlers.backup import backup_router
 from api.admin_panel import setup_admin
 
 # Импорт роутеров API
@@ -50,28 +50,27 @@ async def lifespan(app: FastAPI):
     # Запускаем polling бота параллельно с FastAPI сервером
     polling_task = asyncio.create_task(dp.start_polling(bot))
     
-    backup_polling_task = None
-    if backup_bot and backup_dp:
-        if settings.backup_admin_id:
-            logger.info("Запуск резервного Telegram-бота в фоновом режиме (polling)...")
-            backup_polling_task = asyncio.create_task(backup_dp.start_polling(backup_bot))
-        else:
-            logger.warning("⚠️ Резервный бот НЕ запущен: не указан BACKUP_ADMIN_ID в настройках!")
-    
     yield
     
     logger.info("Остановка приложения...")
     polling_task.cancel()
     await bot.session.close()
-    
-    if backup_polling_task:
-        logger.info("Остановка резервного Telegram-бота...")
-        backup_polling_task.cancel()
-        if backup_bot:
-            await backup_bot.session.close()
 
 # Инициализация FastAPI
 app = FastAPI(title="Vape Shop API", version="1.0.0", lifespan=lifespan)
+
+# HTTP middleware для режима обслуживания (блокировки сайта)
+@app.middleware("http")
+async def check_maintenance(request: Request, call_next):
+    if os.path.exists("maintenance.lock"):
+        path = request.url.path
+        # Разрешаем системные пути и админку, блокируем API и Mini App
+        if not path.startswith("/health") and not path.startswith("/admin") and not path.startswith("/db-status"):
+            return JSONResponse(
+                status_code=503,
+                content={"status": "maintenance", "message": "Сервис временно недоступен. Ведутся технические работы."}
+            )
+    return await call_next(request)
 
 # Настройка CORS для локального тестирования
 app.add_middleware(
@@ -92,17 +91,25 @@ setup_admin(app)
 bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
+# Middleware режима обслуживания для Telegram-бота
+class MaintenanceMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event: TelegramObject, data: dict):
+        if os.path.exists("maintenance.lock"):
+            user_id = getattr(event, "from_user", None) and event.from_user.id
+            if user_id != settings.backup_admin_id:
+                if isinstance(event, Message):
+                    await event.answer("⚠️ Бот временно отключен администратором на техническое обслуживание.")
+                elif isinstance(event, CallbackQuery):
+                    await event.answer("⚠️ Сервис временно недоступен.", show_alert=True)
+                return
+        return await handler(event, data)
+
+dp.message.outer_middleware(MaintenanceMiddleware())
+dp.callback_query.outer_middleware(MaintenanceMiddleware())
+
 # Регистрация хэндлеров бота
 dp.include_router(start_router)
 dp.include_router(admin_router)
-
-# Инициализация резервного бота (если токен указан в настройках)
-backup_bot = None
-backup_dp = None
-if settings.backup_bot_token:
-    backup_bot = Bot(token=settings.backup_bot_token, default=DefaultBotProperties(parse_mode="HTML"))
-    backup_dp = Dispatcher()
-    backup_dp.include_router(backup_router)
 
 @app.get("/health", tags=["System"])
 async def health_check():
