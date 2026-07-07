@@ -374,7 +374,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-app-muted uppercase mb-1">Номер телефона *</label>
-                    <input type="tel" id="checkout-phone" oninput="validateCheckoutForm()" placeholder="+375 (XX) XXX-XX-XX" class="w-full bg-app-card text-white px-4 py-3.5 rounded-xl outline-none border border-white/5 focus:border-app-accent transition-colors">
+                    <input type="tel" id="checkout-phone" oninput="this.value = this.value.replace(/[^\d+\s()-]/g, ''); validateCheckoutForm()" placeholder="+375 (XX) XXX-XX-XX" class="w-full bg-app-card text-white px-4 py-3.5 rounded-xl outline-none border border-white/5 focus:border-app-accent transition-colors">
                 </div>
                 <div id="wrapper-checkout-address">
                     <label class="block text-xs font-semibold text-app-muted uppercase mb-1">Адрес доставки *</label>

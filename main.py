@@ -16,6 +16,7 @@ from core.database import init_db, engine, async_session_maker, setup_initial_da
 from sqlalchemy import text
 from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
+from bot.handlers.backup import backup_router
 from api.admin_panel import setup_admin
 
 # Импорт роутеров API
@@ -49,11 +50,25 @@ async def lifespan(app: FastAPI):
     # Запускаем polling бота параллельно с FastAPI сервером
     polling_task = asyncio.create_task(dp.start_polling(bot))
     
+    backup_polling_task = None
+    if backup_bot and backup_dp:
+        if settings.backup_admin_id:
+            logger.info("Запуск резервного Telegram-бота в фоновом режиме (polling)...")
+            backup_polling_task = asyncio.create_task(backup_dp.start_polling(backup_bot))
+        else:
+            logger.warning("⚠️ Резервный бот НЕ запущен: не указан BACKUP_ADMIN_ID в настройках!")
+    
     yield
     
     logger.info("Остановка приложения...")
     polling_task.cancel()
     await bot.session.close()
+    
+    if backup_polling_task:
+        logger.info("Остановка резервного Telegram-бота...")
+        backup_polling_task.cancel()
+        if backup_bot:
+            await backup_bot.session.close()
 
 # Инициализация FastAPI
 app = FastAPI(title="Vape Shop API", version="1.0.0", lifespan=lifespan)
@@ -80,6 +95,14 @@ dp = Dispatcher()
 # Регистрация хэндлеров бота
 dp.include_router(start_router)
 dp.include_router(admin_router)
+
+# Инициализация резервного бота (если токен указан в настройках)
+backup_bot = None
+backup_dp = None
+if settings.backup_bot_token:
+    backup_bot = Bot(token=settings.backup_bot_token, default=DefaultBotProperties(parse_mode="HTML"))
+    backup_dp = Dispatcher()
+    backup_dp.include_router(backup_router)
 
 @app.get("/health", tags=["System"])
 async def health_check():

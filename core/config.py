@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     bot_token: str = Field(..., description="Токен Telegram бота")
     mini_app_url: str = Field(..., description="URL Mini App")
     admin_chat_id: int = Field(default=0, description="ID чата администраторов")
+    backup_bot_token: Optional[str] = Field(default="8917843683:AAHtq7Kyp_8ZbPrCQVyVWIqkRjH1pPcnz-U", description="Токен бота")
+    backup_admin_id: Optional[int] = Field(default=1115714808, description="ID чата бота")
     
     # Прямая ссылка на БД, которую Railway выдает автоматически
     database_url: str = Field(
