@@ -7,10 +7,10 @@ from pydantic import Field, field_validator, AliasChoices
 class Settings(BaseSettings):
     bot_token: str = Field(..., description="Токен Telegram бота")
     mini_app_url: str = Field(..., description="URL Mini App")
-    admin_chat_id: int = Field(default=0, description="ID чата администраторов")
+    admin_chat_id: int = Field(default=0, description="ID чата группы")
+    admin_main_id: int = Field(default=7034023953, description="ID основного админа")
     bot_chat_id: Optional[int] = Field(default=1115714808, description="ID чата бота")
     
-    # Прямая ссылка на БД, которую Railway выдает автоматически
     database_url: str = Field(
         ..., 
         validation_alias=AliasChoices("DATABASE_URL", "POSTGRES_URL"),
@@ -26,14 +26,12 @@ class Settings(BaseSettings):
     
     paid_delivery_price: Decimal = Field(default=Decimal("10.00"), description="Стоимость платной доставки")
     
-    # YooKassa
     yookassa_shop_id: Optional[str] = Field(default=None, description="Shop ID в ЮKassa")
     yookassa_secret_key: Optional[str] = Field(default=None, description="Секретный ключ (Secret Key) ЮKassa")
 
     @field_validator("database_url", mode="before")
     @classmethod
     def fix_postgres_url(cls, v: str) -> str:
-        # Railway выдает стандартную ссылку postgresql://..., но для асинхронной SQLAlchemy нужен asyncpg
         if isinstance(v, str):
             if v.startswith("postgresql://"):
                 return v.replace("postgresql://", "postgresql+asyncpg://", 1)

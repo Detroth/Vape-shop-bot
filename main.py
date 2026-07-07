@@ -19,10 +19,8 @@ from bot.handlers.start import start_router
 from bot.handlers.admin import admin_router
 from api.admin_panel import setup_admin
 
-# Импорт роутеров API
 from api.routes import api_router
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
@@ -31,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Маскируем пароль регулярным выражением для безопасного вывода в логи
     safe_url = re.sub(r":([^:@]+)@", r":******@", settings.database_url)
     logger.info(f"Попытка подключения к БД по адресу: {safe_url}")
     
@@ -47,7 +44,6 @@ async def lifespan(app: FastAPI):
         raise e
         
     logger.info("Запуск Telegram-бота в фоновом режиме (polling)...")
-    # Запускаем polling бота параллельно с FastAPI сервером
     polling_task = asyncio.create_task(dp.start_polling(bot))
     
     yield
@@ -56,23 +52,21 @@ async def lifespan(app: FastAPI):
     polling_task.cancel()
     await bot.session.close()
 
-# Инициализация FastAPI
 app = FastAPI(title="Vape Shop API", version="1.0.0", lifespan=lifespan)
 
-# HTTP middleware для режима обслуживания (блокировки сайта)
+
 @app.middleware("http")
 async def check_maintenance(request: Request, call_next):
     if os.path.exists("maintenance.lock"):
         path = request.url.path
-        # Разрешаем системные пути и админку, блокируем API и Mini App
         if not path.startswith("/health") and not path.startswith("/admin") and not path.startswith("/db-status"):
             return JSONResponse(
                 status_code=503,
-                content={"status": "maintenance", "message": "Сервис временно недоступен. Ведутся технические работы."}
+                content={"status": "maintenance", "message": "Сервис временно недоступен."}
             )
     return await call_next(request)
 
-# Настройка CORS для локального тестирования
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -81,24 +75,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Регистрация эндпоинтов Mini App
 app.include_router(api_router, prefix="/api")
 
-# Инициализация современной админ-панели (FastAPI Amis Admin)
 setup_admin(app)
 
-# Инициализация бота и диспетчера
 bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
-# Middleware режима обслуживания для Telegram-бота
 class MaintenanceMiddleware(BaseMiddleware):
     async def __call__(self, handler, event: TelegramObject, data: dict):
         if os.path.exists("maintenance.lock"):
             user_id = getattr(event, "from_user", None) and event.from_user.id
             if user_id != settings.bot_chat_id:
                 if isinstance(event, Message):
-                    await event.answer("⚠️ Бот временно отключен администратором на техническое обслуживание.")
+                    await event.answer("⚠️ Бот временно недопступен.")
                 elif isinstance(event, CallbackQuery):
                     await event.answer("⚠️ Сервис временно недоступен.", show_alert=True)
                 return
@@ -107,21 +97,17 @@ class MaintenanceMiddleware(BaseMiddleware):
 dp.message.outer_middleware(MaintenanceMiddleware())
 dp.callback_query.outer_middleware(MaintenanceMiddleware())
 
-# Регистрация хэндлеров бота
 dp.include_router(start_router)
 dp.include_router(admin_router)
 
 @app.get("/health", tags=["System"])
 async def health_check():
-    """Простейший эндпоинт для проверки жизнеспособности (Railway healthcheck)."""
     return {"status": "ok"}
 
 @app.get("/db-status", tags=["System"])
 async def db_status_check():
-    """Диагностический эндпоинт для проверки реального состояния базы данных."""
     try:
         async with engine.connect() as conn:
-            # Запрашиваем у самого PostgreSQL список реально существующих таблиц
             result = await conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public';"))
             tables = [row[0] for row in result.fetchall()]
             
@@ -131,12 +117,9 @@ async def db_status_check():
 
 @app.get("/api/config", tags=["System"])
 async def get_public_config():
-    """Отдает публичные настройки для Mini App."""
     return {"support_account": os.getenv("SUPPORT_ACCOUNT", "")}
 
-# Монтируем статику в корень (ДОЛЖНО БЫТЬ В САМОМ НИЗУ, чтобы не перекрыть /api и /admin)
 app.mount("/", StaticFiles(directory="web", html=True), name="web")
 
 if __name__ == "__main__":
-    # Передаем объект app напрямую, чтобы избежать двойного импорта файла и ошибки "Router is already attached"
     uvicorn.run(app, host="0.0.0.0", port=settings.port)

