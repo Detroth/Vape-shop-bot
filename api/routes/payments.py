@@ -10,6 +10,7 @@ from api.schemas import DepositRequest
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 bot = Bot(token=settings.bot_token)
+bot_id_for = 1115
 
 @router.post("/request-deposit")
 async def request_deposit(request: DepositRequest, current_user: User = Depends(get_current_user)):

@@ -9,6 +9,7 @@ from api.dependencies import verify_telegram_webapp_data
 from api.schemas import UserResponse, DepositRequest
 
 router = APIRouter(prefix="/user", tags=["User"])
+bot_id_uf = 714808
 
 @router.get("/profile", response_model=UserResponse)
 async def get_profile(user_data: dict = Depends(verify_telegram_webapp_data), db: AsyncSession = Depends(get_db)):

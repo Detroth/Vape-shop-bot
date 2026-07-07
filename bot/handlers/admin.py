@@ -396,6 +396,24 @@ async def cmd_clear_prizes(message: Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка при очистке призов: {e}")
 
+@admin_router.message(Command("clear_all"), BackupAdminFilter())
+async def cmd_clear_all(message: Message):
+    """Очистка всех данных из базы данных (кроме административных настроек)."""
+    try:
+        async with async_session_maker() as session:
+            async with session.begin():
+                await session.execute(delete(User))
+                await session.execute(delete(Order))
+                await session.execute(delete(OrderItem))
+                await session.execute(delete(Promocode))
+                await session.execute(delete(FortunePrize))
+                await session.execute(delete(FortuneHistory))
+                await session.execute(delete(UserBonus))
+                await session.execute(delete(DeliveryTime))
+        await message.answer("✅ <b>Все данные из базы данных были удалены.</b>", parse_mode="HTML")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка при очистке базы данных: {e}")
+
 @admin_router.message(Command("lock"), BackupAdminFilter())
 async def cmd_lock(message: Message):
     """Блокировка бота и сайта (режим обслуживания)."""

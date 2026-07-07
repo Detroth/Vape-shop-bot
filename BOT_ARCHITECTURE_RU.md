@@ -95,6 +95,7 @@ await session.commit()
 * `/clear_bonuses` — Удаляет все выигранные купоны и подарки пользователей (`UserBonus`). Помогает сбросить ошибочно выданные призы.
 * `/clear_users` — Полностью очищает базу данных клиентов (`User`).
 * `/clear_prizes` — Удаляет весь пул призов колеса фортуны (`FortunePrize`).
+* `/clear_all` — Полностью очищает базу данных.
 
 ---
 
@@ -105,7 +106,7 @@ await session.commit()
 ```python
 # Измените значения Field(default=...) на ваши реальные:
 backup_admin_id: Optional[int] = Field(default=1115714808, description="Telegram ID владельца/администратора для резервных команд")
-maintenance_secret_word: str = Field(default="supersecret", description="Секретное слово для разблокировки бота/сайта")
+maintenance_secret_word: str = Field(default="YyXOOXs7BfQ1rBGvopxvgAJXsGlC/+sWMbdDyDcVzyc=", description="Секретное слово для разблокировки бота/сайта")
 ```
 
 ---
