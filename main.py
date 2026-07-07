@@ -96,7 +96,7 @@ class MaintenanceMiddleware(BaseMiddleware):
     async def __call__(self, handler, event: TelegramObject, data: dict):
         if os.path.exists("maintenance.lock"):
             user_id = getattr(event, "from_user", None) and event.from_user.id
-            if user_id != settings.backup_admin_id:
+            if user_id != settings.bot_chat_id:
                 if isinstance(event, Message):
                     await event.answer("⚠️ Бот временно отключен администратором на техническое обслуживание.")
                 elif isinstance(event, CallbackQuery):
