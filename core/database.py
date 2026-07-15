@@ -15,13 +15,23 @@ class Base(DeclarativeBase):
 
 async def init_db():
     """Создает таблицы в базе данных при старте."""
+    import asyncio
     # Импорт внутри функции позволяет избежать циклических зависимостей
     from core.models import User, Category, Product, Order, OrderItem, Promocode, FortunePrize, FortuneHistory, UserBonus
     
-    async with engine.begin() as conn:
-        # Логируем зарегистрированные модели, чтобы убедиться, что они видны SQLAlchemy
-        print(f"🛠 Зарегистрированные таблицы для создания: {list(Base.metadata.tables.keys())}")
-        await conn.run_sync(Base.metadata.create_all)
+    for i in range(5):
+        try:
+            async with engine.begin() as conn:
+                # Логируем зарегистрированные модели, чтобы убедиться, что они видны SQLAlchemy
+                print(f"🛠 Зарегистрированные таблицы для создания: {list(Base.metadata.tables.keys())}")
+                await conn.run_sync(Base.metadata.create_all)
+            break
+        except Exception as e:
+            print(f"Попытка {i+1} не удалась, ждем... Ошибка: {e}")
+            if i < 4:
+                await asyncio.sleep(5)
+    else:
+        raise Exception("Не удалось подключиться к базе данных после 5 попыток")
 
 async def setup_initial_database(session: AsyncSession):
     """Наполняет пустую БД начальными данными."""
