@@ -4,7 +4,12 @@ from sqlalchemy.orm import DeclarativeBase
 from core.config import settings
 
 # Включаем echo=True для дебага: теперь в логах Railway вы увидите ВСЕ SQL-запросы, включая CREATE TABLE
-engine = create_async_engine(settings.database_url, echo=True, pool_pre_ping=True)
+engine = create_async_engine(
+    settings.database_url,
+    echo=True,
+    pool_pre_ping=True,
+    connect_args={"ssl": False}
+)
 
 async_session_maker = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
