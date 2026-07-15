@@ -17,7 +17,7 @@ class Settings(BaseSettings):
         description="Полная строка подключения к БД (Railway)"
     )
     
-    port: int = Field(default=8080, description="Порт для FastAPI")
+    port: int = Field(default=80, description="Порт для FastAPI")
 
     admin_username: str = Field("admin", description="Логин админ-панели")
     admin_password: str = Field("admin", description="Пароль админ-панели")
