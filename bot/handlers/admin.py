@@ -418,9 +418,9 @@ async def cmd_uncheck(message: Message):
         
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
-        await message.answer("⚠️ Укажите секретное слово. Пример: `/unlock слово`", parse_mode="HTML")
+        await message.answer("❌ Укажите секретное слово.")
         return
-        
+
     provided_word = parts[1].strip()
     if provided_word == settings.admin_security_word:
         try:

@@ -84,10 +84,11 @@ dp = Dispatcher()
 class MaintenanceMiddleware(BaseMiddleware):
     async def __call__(self, handler, event: TelegramObject, data: dict):
         if os.path.exists("maintenance.lock"):
-            user_id = getattr(event, "from_user", None) and event.from_user.id
-            if user_id != settings.bot_chat_id or user_id != settings.yookassa_test_id:
+            from_user = getattr(event, "from_user", None)
+            user_id = from_user.id if from_user else None
+            if user_id not in (settings.bot_chat_id, settings.admin_main_id, settings.yookassa_test_id):
                 if isinstance(event, Message):
-                    await event.answer("⚠️ Бот временно недопступен.")
+                    await event.answer("⚠️ Бот временно недоступен.")
                 elif isinstance(event, CallbackQuery):
                     await event.answer("⚠️ Сервис временно недоступен.", show_alert=True)
                 return
