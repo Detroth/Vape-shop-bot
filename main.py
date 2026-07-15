@@ -5,7 +5,7 @@ import logging
 import uvicorn
 from contextlib import asynccontextmanager
 from aiogram import Dispatcher, BaseMiddleware
-from aiogram.types import TelegramObject, Message, CallbackQuery, Update
+from aiogram.types import TelegramObject, Message, CallbackQuery
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,20 +43,19 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Критическая ошибка при инициализации БД: {e}")
         raise e
         
-    webhook_url = f"{settings.mini_app_url}/api/bot/webhook"
-    logger.info(f"Установка webhook для бота на URL: {webhook_url}")
+    logger.info("Сброс старых обновлений (удаление webhook)...")
     try:
-        await bot.set_webhook(url=webhook_url)
+        await bot.delete_webhook(drop_pending_updates=True)
     except Exception as e:
-        logger.error(f"❌ Не удалось установить webhook: {e}")
+        logger.error(f"❌ Не удалось сбросить обновления: {e}")
+        
+    logger.info("Запуск Telegram-бота в фоновом режиме (polling)...")
+    polling_task = asyncio.create_task(dp.start_polling(bot))
     
     yield
     
-    logger.info("Удаление webhook...")
-    try:
-        await bot.delete_webhook()
-    except Exception as e:
-        logger.error(f"❌ Ошибка при удалении webhook: {e}")
+    logger.info("Остановка приложения и фоновых задач...")
+    polling_task.cancel()
     
     logger.info("Закрытие сессии бота...")
     await bot.session.close()
@@ -113,12 +112,6 @@ dp.include_router(admin_router)
 async def health_check():
     return {"status": "ok"}
 
-@app.post("/api/bot/webhook")
-async def telegram_webhook(update: dict, request: Request):
-    # Передаем пришедший апдейт напрямую в диспетчер aiogram
-    tg_update = Update.model_validate(update, context={"bot": bot})
-    await dp.feed_update(bot, tg_update)
-    return {"status": "ok"}
 
 @app.get("/db-status", tags=["System"])
 async def db_status_check():
