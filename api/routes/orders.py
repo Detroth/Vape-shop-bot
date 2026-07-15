@@ -1,5 +1,7 @@
 from typing import List, Optional
 from decimal import Decimal
+from datetime import datetime, timezone, timedelta
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -79,6 +81,27 @@ async def create_order(
                 active_bonus.is_used = True # Товар забирается
 
     if request.delivery_type == "paid":
+        if request.delivery_date and request.delivery_time:
+            # Часовой пояс Минск/Москва (UTC+3)
+            tz_minsk = timezone(timedelta(hours=3))
+            now_minsk = datetime.now(tz_minsk)
+            today_str = now_minsk.strftime("%d.%m.%Y")
+            
+            if request.delivery_date == today_str:
+                # Извлекаем время начала из строки интервала (например, "12:00 - 15:00" -> "12:00")
+                match = re.search(r"(\d{1,2}):(\d{2})", request.delivery_time)
+                if match:
+                    start_hour = int(match.group(1))
+                    start_min = int(match.group(2))
+                    
+                    current_hour = now_minsk.hour
+                    current_min = now_minsk.minute
+                    
+                    if current_hour > start_hour or (current_hour == start_hour and current_min >= start_min):
+                        raise HTTPException(
+                            status_code=400, 
+                            detail="Выбранный временной интервал доставки на сегодня уже недоступен"
+                        )
         base_total += settings.paid_delivery_price
 
     final_total = max(Decimal("0.00"), base_total)

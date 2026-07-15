@@ -1182,6 +1182,7 @@ function selectDeliveryDate(dateStr) {
     selectedDeliveryDate = dateStr;
     tg.HapticFeedback.selectionChanged();
     renderDeliveryDates();
+    renderDeliveryTimes();
 }
 
 function renderDeliveryTimes() {
@@ -1191,9 +1192,43 @@ function renderDeliveryTimes() {
         container.innerHTML = '<div class="text-xs text-app-muted py-2">Слоты времени недоступны</div>';
         return;
     }
+
+    const todayStr = new Date().toLocaleDateString('ru-RU');
+    const isToday = (selectedDeliveryDate === todayStr);
+    
+    let filteredTimes = availableDeliveryTimes;
+    if (isToday) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMin = now.getMinutes();
+        
+        filteredTimes = availableDeliveryTimes.filter(t => {
+            const match = t.time_slot.match(/(\d{1,2}):(\d{2})/);
+            if (match) {
+                const startHour = parseInt(match[1], 10);
+                const startMin = parseInt(match[2], 10);
+                if (currentHour > startHour) return false;
+                if (currentHour === startHour && currentMin >= startMin) return false;
+            }
+            return true;
+        });
+    }
+
+    if (filteredTimes.length === 0) {
+        container.innerHTML = '<div class="text-xs text-app-muted py-2">На сегодня доступных слотов больше нет</div>';
+        selectedDeliveryTime = null;
+        validateCheckoutForm();
+        return;
+    }
+
+    // Ensure selectedDeliveryTime is valid and still exists in the filtered times
+    const isStillAvailable = filteredTimes.some(t => t.time_slot === selectedDeliveryTime);
+    if (!isStillAvailable) {
+        selectedDeliveryTime = filteredTimes[0].time_slot;
+    }
+
     let html = '';
-    availableDeliveryTimes.forEach((t, i) => {
-        if (!selectedDeliveryTime && i === 0) selectedDeliveryTime = t.time_slot;
+    filteredTimes.forEach((t, i) => {
         const isSelected = selectedDeliveryTime === t.time_slot;
         const btnClass = isSelected ? 'bg-app-accent text-white border-app-accent' : 'bg-app-card text-app-muted border-white/5';
         html += `<button onclick="selectDeliveryTime('${t.time_slot}')" class="px-4 py-2.5 rounded-xl whitespace-nowrap text-sm font-bold border ${btnClass} transition-colors">${t.time_slot}</button>`;
