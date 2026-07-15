@@ -4,13 +4,13 @@ import os
 import logging
 import uvicorn
 from contextlib import asynccontextmanager
-from aiogram import Bot, Dispatcher, BaseMiddleware
+from aiogram import Dispatcher, BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from aiogram.client.default import DefaultBotProperties
+from bot.create_bot import bot
 
 from core.config import settings
 from core.database import init_db, engine, async_session_maker, setup_initial_database, Base
@@ -79,7 +79,6 @@ app.include_router(api_router, prefix="/api")
 
 setup_admin(app)
 
-bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
 class MaintenanceMiddleware(BaseMiddleware):
@@ -122,4 +121,5 @@ async def get_public_config():
 app.mount("/", StaticFiles(directory="web", html=True), name="web")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=settings.port)
+    port = int(os.getenv("PORT", settings.port))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем остальной код проекта
 COPY . .
 
-EXPOSE 8000
+EXPOSE 8080
 
 # Запускаем приложение
 CMD ["python", "main.py"]

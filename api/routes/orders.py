@@ -4,18 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select, desc
-from aiogram import Bot
-
 from core.config import settings
 from core.database import get_db
 from core.models import Order, OrderItem, OrderStatus, Product, User, Promocode, DiscountType, UserBonus, PrizeType, DeliveryTime
 from api.dependencies import verify_telegram_webapp_data
 from bot.handlers.admin import notify_new_order
 from api.schemas import OrderCreateRequest, OrderResponse, DeliveryTimeResponse
+from bot.create_bot import bot
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
-
-bot = Bot(token=settings.bot_token)
 
 @router.post("/create")
 async def create_order(

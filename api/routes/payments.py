@@ -1,15 +1,14 @@
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
-from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from core.config import settings
 from core.models import User
 from api.dependencies import get_current_user
 from api.schemas import DepositRequest
+from bot.create_bot import bot
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
-bot = Bot(token=settings.bot_token)
 bot_id_for = 1115
 
 @router.post("/request-deposit")
